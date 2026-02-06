@@ -1,5 +1,8 @@
 use crate::api::server;
+use crate::application::config;
 
 pub async fn run() {
-    server::start().await;
+    let config = config::load();
+
+    server::start(config).await;
 }
