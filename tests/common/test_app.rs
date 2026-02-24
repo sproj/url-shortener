@@ -10,7 +10,14 @@ pub async fn run() {
     let config = config::load();
     helpers::CONFIG.get_or_init(|| config.clone());
 
-    tokio::spawn(async move { server::start(config).await });
+    let listener = server::listen(&config).await;
+    let addr = listener.local_addr().unwrap();
+
+    dbg!(format!("test_app will listen on port: {}", &addr));
+    helpers::ADDR.get_or_init(|| format!("http://{}", addr));
+
+    tokio::spawn(server::serve(listener));
+    // tokio::spawn(async move { server::serve(listener).await });
 
     wait_for_service(Duration::from_secs(5)).await
 }

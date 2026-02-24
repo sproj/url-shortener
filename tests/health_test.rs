@@ -15,3 +15,4 @@ async fn health_test() {
 
     assert_eq!(json["status"], "healthy");
 }
+

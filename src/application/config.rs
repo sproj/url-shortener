@@ -13,6 +13,10 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn service_host(&self) -> String {
+        format!("{}://{}", "http", self.service_host)
+    }
+
     pub fn service_http_address(&self) -> String {
         format!("{}://{}:{}", "http", self.service_host, self.service_port)
     }
