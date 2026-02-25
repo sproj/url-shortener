@@ -41,12 +41,12 @@ pub fn load() -> Config {
         println!("{} file not found, using existing environment", env_file);
     }
 
-    let config = Config {
+    
+
+    Config {
         service_host: env_get("SERVICE_HOST"),
         service_port: env_parse("SERVICE_PORT"),
-    };
-
-    config
+    }
 }
 
 fn env_get(key: &str) -> String {
@@ -67,11 +67,8 @@ fn env_get_or(key: &str, default: &str) -> String {
 }
 
 fn env_parse<T: std::str::FromStr>(key: &str) -> T {
-    env_get(key).parse().map_or_else(
-        |_| {
+    env_get(key).parse().unwrap_or_else(|_| {
             let msg = format!("Failed to parse: {}", key);
             panic!("{msg}")
-        },
-        |v| v,
-    )
+        })
 }
