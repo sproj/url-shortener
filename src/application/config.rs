@@ -1,5 +1,7 @@
 use std::net::SocketAddr;
 
+use crate::application::startup_error::StartupError;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub service_host: String,
@@ -27,7 +29,7 @@ impl Config {
     }
 }
 
-pub fn load() -> Config {
+pub fn load() -> Result<Config, StartupError> {
     let env_file = if env_get_or("ENV_TEST", "0") == "1" {
         ".env.test"
     } else {
@@ -38,15 +40,15 @@ pub fn load() -> Config {
     if dotenvy::from_filename(env_file).is_ok() {
         println!("{} file loaded", env_file);
     } else {
-        println!("{} file not found, using existing environment", env_file);
+        let config_not_found = format!("{} file not found, using existing environment", env_file);
+        println!("{}", config_not_found);
+        return Err(StartupError::Config(config_not_found));
     }
 
-    
-
-    Config {
+    Ok(Config {
         service_host: env_get("SERVICE_HOST"),
         service_port: env_parse("SERVICE_PORT"),
-    }
+    })
 }
 
 fn env_get(key: &str) -> String {
@@ -68,7 +70,7 @@ fn env_get_or(key: &str, default: &str) -> String {
 
 fn env_parse<T: std::str::FromStr>(key: &str) -> T {
     env_get(key).parse().unwrap_or_else(|_| {
-            let msg = format!("Failed to parse: {}", key);
-            panic!("{msg}")
-        })
+        let msg = format!("Failed to parse: {}", key);
+        panic!("{msg}")
+    })
 }
