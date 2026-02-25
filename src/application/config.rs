@@ -29,7 +29,7 @@ impl Config {
 
 pub fn load() -> Config {
     let env_file = if env_get_or("ENV_TEST", "0") == "1" {
-        ".env_test"
+        ".env.test"
     } else {
         ".env"
     };
