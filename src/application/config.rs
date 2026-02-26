@@ -6,12 +6,12 @@ use crate::application::startup_error::StartupError;
 pub struct Config {
     pub service_host: String,
     pub service_port: u16,
-    // pub postgres_user: String,
-    // pub postgres_password: String,
-    // pub postgres_host: String,
-    // pub postgres_port: u16,
-    // pub postgres_db: String,
-    // pub postgres_connection_pool: u32,
+    pub postgres_user: String,
+    pub postgres_password: String,
+    pub postgres_host: String,
+    pub postgres_port: u16,
+    pub postgres_db: String,
+    pub postgres_connection_pool: u32,
 }
 
 impl Config {
@@ -48,6 +48,12 @@ pub fn load() -> Result<Config, StartupError> {
     Ok(Config {
         service_host: env_get("SERVICE_HOST"),
         service_port: env_parse("SERVICE_PORT"),
+        postgres_user: env_get("POSTGRES_USER"),
+        postgres_password: env_get("POSTGRES_PASSWORD"),
+        postgres_host: env_get("POSTGRES_HOST"),
+        postgres_port: env_parse("POSTGRES_PORT"),
+        postgres_db: env_get("POSTGRES_DB"),
+        postgres_connection_pool: env_parse("POSTGRES_CONNECTION_POOL"),
     })
 }
 
