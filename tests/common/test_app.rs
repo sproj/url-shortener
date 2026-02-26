@@ -1,10 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use reqwest::StatusCode;
 use tokio::time::Instant;
 use url_shortener::{
     api::server,
-    application::{config, state::AppState},
+    application::config,
 };
 
 use crate::common::{constants, helpers};
@@ -12,8 +12,8 @@ use crate::common::{constants, helpers};
 pub async fn run() {
     let config = config::load().unwrap();
     helpers::CONFIG.get_or_init(|| config.clone());
-    let app_state = Arc::new(AppState { config });
-    let listener = server::listen(&app_state.config).await.unwrap();
+    
+    let listener = server::listen(config).await.unwrap();
     let addr = listener.local_addr().unwrap();
 
     dbg!(format!("test_app will listen on port: {}", &addr));
