@@ -6,7 +6,7 @@ use axum::{
     Json, Router, extract::Request, http::StatusCode, response::IntoResponse, routing::get,
 };
 use serde_json::json;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, signal};
 
 pub async fn start(config: Config) {
     let listener = listen(config).await.unwrap();
@@ -27,7 +27,10 @@ pub async fn serve(listener: TcpListener) {
         .nest("/hello", hello_routes::routes())
         .fallback(error_404_handler);
 
-    axum::serve(listener, router).await.unwrap()
+    axum::serve(listener, router)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap()
 }
 
 // health request handler
@@ -39,4 +42,28 @@ async fn health_handler() -> Result<impl IntoResponse, ()> {
 async fn error_404_handler(request: Request) -> impl IntoResponse {
     println!("route not found: {:?}", request);
     StatusCode::NOT_FOUND
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
