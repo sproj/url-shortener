@@ -4,7 +4,7 @@ use hyper::StatusCode;
 
 #[tokio::test]
 async fn positive_404() {
-    let sut = test_app::run().await;
+    let sut = test_app::spawn().await;
 
     let url = sut.build_path("no_such_path");
     let response = reqwest::get(url).await.unwrap();
