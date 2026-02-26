@@ -7,7 +7,7 @@ use url_shortener::{
     application::config,
 };
 
-use crate::common::helpers;
+use crate::common::{constants, helpers};
 pub struct TestApp {
     socket_address: SocketAddr
 }
@@ -32,25 +32,27 @@ pub async fn run() -> TestApp {
     tokio::spawn(server::serve(listener));
     // tokio::spawn(async move { server::serve(listener).await });
 
-    // wait_for_service(Duration::from_secs(5)).await
-
-    return TestApp {
+    let sut = TestApp {
         socket_address: addr
-    }
+    };
+
+    let healthz = sut.build_path(constants::API_PATH_HEALTH);
+    wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
+
+    return sut
 }
 
-// async fn wait_for_service(duration: Duration) {
-//     let timeout = Instant::now() + duration;
-//     loop {
-//         let url = helpers::build_path(constants::API_PATH_HEALTH);
-//         if let Ok(response) = reqwest::get(url).await
-//             && response.status() == StatusCode::OK
-//         {
-//             break;
-//         }
-//         if Instant::now() > timeout {
-//             panic!("Could not start API Server in: {:?}", duration);
-//         }
-//         tokio::time::sleep(Duration::from_millis(20)).await;
-//     }
-// }
+async fn wait_for_service(duration: Duration, url: &str) {
+    let timeout = Instant::now() + duration;
+    loop {
+        if let Ok(response) = reqwest::get(url).await
+            && response.status() == StatusCode::OK
+        {
+            break;
+        }
+        if Instant::now() > timeout {
+            panic!("Could not start API Server in: {:?}", duration);
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
