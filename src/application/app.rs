@@ -1,15 +1,14 @@
 use crate::api::server;
 use crate::application::config;
 use crate::application::startup_error::StartupError;
-use crate::application::state::AppState;
 
-pub async fn build() -> Result<AppState, StartupError> {
+pub async fn build() -> Result<config::Config, StartupError> {
     let config = config::load()?;
 
-    Ok(AppState { config })
+    Ok(config)
 }
 
-pub async fn run(state: AppState) -> Result<(), StartupError> {
-    server::start(state).await;
+pub async fn run(config: config::Config) -> Result<(), StartupError> {
+    server::start(config).await;
     Ok(())
 }
