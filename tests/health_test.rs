@@ -3,7 +3,7 @@ use common::{constants::API_PATH_HEALTH, test_app};
 
 #[tokio::test]
 async fn health_test() {
-    let sut = test_app::run().await;
+    let sut = test_app::spawn().await;
 
     let url = sut.build_path(API_PATH_HEALTH);
     let response = reqwest::get(url).await.unwrap();

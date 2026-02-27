@@ -1,17 +1,21 @@
 use crate::{
     api::routes::hello_routes,
-    application::{config::Config, startup_error::StartupError, state::AppState},
+    application::{config::Config, startup_error::StartupError, state::SharedState},
 };
 use axum::{
-    Json, Router, extract::Request, http::StatusCode, response::IntoResponse, routing::get,
+    Json, Router,
+    extract::{Request, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
 };
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
 
-pub async fn start(config: Config) {
+pub async fn start(config: Config, state: SharedState) {
     let listener = listen(config).await.unwrap();
 
-    serve(listener).await
+    serve(listener, state).await
 }
 
 pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
@@ -21,11 +25,13 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
         .map_err(|e| StartupError::Server(e.to_string()))
 }
 
-pub async fn serve(listener: TcpListener) {
+pub async fn serve(listener: TcpListener, state: SharedState) {
     let router = Router::new()
         .route("/health", get(health_handler))
+        .route("/ready", get(ready_handler))
         .nest("/hello", hello_routes::routes())
-        .fallback(error_404_handler);
+        .fallback(error_404_handler)
+        .with_state(state);
 
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
@@ -42,6 +48,20 @@ async fn health_handler() -> Result<impl IntoResponse, ()> {
 async fn error_404_handler(request: Request) -> impl IntoResponse {
     println!("route not found: {:?}", request);
     StatusCode::NOT_FOUND
+}
+
+// ready handler
+async fn ready_handler(State(state): State<SharedState>) -> StatusCode {
+    match state.db_pool.get().await {
+        Ok(client) => {
+            if client.query_one("SELECT 1", &[]).await.is_ok() {
+                StatusCode::OK
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
+        }
+        Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+    }
 }
 
 async fn shutdown_signal() {
