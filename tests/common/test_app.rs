@@ -4,10 +4,10 @@ use std::time::Duration;
 use tokio::time::Instant;
 use url_shortener::{
     api::server,
-    application::{app::build, config::Config},
+    application::{app::build, config::Config, startup_error::StartupError},
 };
 
-use crate::common::{constants, helpers};
+use crate::common::{constants, test_db};
 pub struct TestApp {
     socket_address: SocketAddr,
 }
@@ -20,14 +20,33 @@ impl TestApp {
     }
 }
 
+pub async fn spawn() -> TestApp {
+    let mut config = load_config().await.unwrap();
+
+    let shared = &*test_db::SHARED_POSTGRES;
+
+    config.db.postgres_host = shared.host.clone();
+    config.db.postgres_port = shared.port.clone();
+    config.db.postgres_db = shared.db_name.clone();
+    config.db.postgres_user = shared.user.clone();
+    config.db.postgres_password = shared.password.clone();
+
+    spawn_with_config(config).await
+}
+
+pub async fn load_config() -> Result<Config, StartupError> {
+    url_shortener::application::config::load()
+}
+
 pub async fn spawn_with_config(config: Config) -> TestApp {
     let cfg = config.clone();
+
+    let state = build(&cfg).await.unwrap();
 
     let listener = server::listen(config).await.unwrap();
     let addr = listener.local_addr().unwrap();
     dbg!(format!("test_app will listen on port: {}", &addr));
 
-    let state = build(&cfg).await.unwrap();
     tokio::spawn(server::serve(listener, state));
     // tokio::spawn(async move { server::serve(listener).await });
 
@@ -39,13 +58,6 @@ pub async fn spawn_with_config(config: Config) -> TestApp {
     wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
 
     return sut;
-}
-
-pub async fn spawn() -> TestApp {
-    let config = url_shortener::application::config::load().unwrap();
-    helpers::CONFIG.get_or_init(|| config.clone());
-
-    spawn_with_config(config).await
 }
 
 async fn wait_for_service(duration: Duration, url: &str) {
