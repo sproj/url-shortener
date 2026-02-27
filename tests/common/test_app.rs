@@ -19,6 +19,7 @@ impl TestApp {
         reqwest::Url::parse(&url).unwrap()
     }
 }
+
 pub async fn spawn_with_config(config: Config) -> TestApp {
     let cfg = config.clone();
 

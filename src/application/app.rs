@@ -14,13 +14,13 @@ pub async fn load() -> Result<Config, StartupError> {
 
 pub async fn build(config: &Config) -> Result<SharedState, StartupError> {
     let mut pg = PgConfig::new();
-    pg.user = Some(config.postgres_user.clone());
-    pg.password = Some(config.postgres_password.clone());
-    pg.host = Some(config.postgres_host.clone());
-    pg.port = Some(config.postgres_port);
-    pg.dbname = Some(config.postgres_db.clone());
+    pg.user = Some(config.db.postgres_user.clone());
+    pg.password = Some(config.db.postgres_password.clone());
+    pg.host = Some(config.db.postgres_host.clone());
+    pg.port = Some(config.db.postgres_port);
+    pg.dbname = Some(config.db.postgres_db.clone());
     pg.pool = Some(deadpool_postgres::PoolConfig {
-        max_size: config.postgres_connection_pool as usize,
+        max_size: config.db.postgres_connection_pool as usize,
         ..Default::default()
     });
 
