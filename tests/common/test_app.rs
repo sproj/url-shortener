@@ -1,5 +1,6 @@
 use core::net::SocketAddr;
 use reqwest::StatusCode;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::Instant;
 use url_shortener::{
@@ -7,9 +8,14 @@ use url_shortener::{
     application::{app::build, config::Config, startup_error::StartupError},
 };
 
-use crate::common::{constants, test_db};
+use crate::common::{
+    constants,
+    test_db::{self, SharedTestDb},
+};
+
 pub struct TestApp {
     socket_address: SocketAddr,
+    _db: Arc<SharedTestDb>,
 }
 
 impl TestApp {
@@ -21,24 +27,23 @@ impl TestApp {
 }
 
 pub async fn spawn() -> TestApp {
+    let db = test_db::get_or_create().await;
+
     let mut config = load_config().await.unwrap();
+    config.db.postgres_host = db.host.clone();
+    config.db.postgres_port = db.port;
+    config.db.postgres_db = db.db_name.clone();
+    config.db.postgres_user = db.user.clone();
+    config.db.postgres_password = db.password.clone();
 
-    let shared = &*test_db::SHARED_POSTGRES;
-
-    config.db.postgres_host = shared.host.clone();
-    config.db.postgres_port = shared.port.clone();
-    config.db.postgres_db = shared.db_name.clone();
-    config.db.postgres_user = shared.user.clone();
-    config.db.postgres_password = shared.password.clone();
-
-    spawn_with_config(config).await
+    spawn_with_config(config, db).await
 }
 
 pub async fn load_config() -> Result<Config, StartupError> {
     url_shortener::application::config::load()
 }
 
-pub async fn spawn_with_config(config: Config) -> TestApp {
+pub async fn spawn_with_config(config: Config, db: Arc<SharedTestDb>) -> TestApp {
     let cfg = config.clone();
 
     let state = build(&cfg).await.unwrap();
@@ -48,16 +53,16 @@ pub async fn spawn_with_config(config: Config) -> TestApp {
     dbg!(format!("test_app will listen on port: {}", &addr));
 
     tokio::spawn(server::serve(listener, state));
-    // tokio::spawn(async move { server::serve(listener).await });
 
     let sut = TestApp {
         socket_address: addr,
+        _db: db,
     };
 
     let healthz = sut.build_path(constants::API_PATH_HEALTH);
     wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
 
-    return sut;
+    sut
 }
 
 async fn wait_for_service(duration: Duration, url: &str) {
