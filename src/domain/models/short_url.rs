@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
 use tokio_postgres::Row;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ShortUrl {
-    pub id: u32,
+    pub id: i64,
     pub code: String,
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
@@ -21,7 +21,7 @@ impl ShortUrl {
 impl From<Row> for ShortUrl {
     fn from(row: Row) -> Self {
         Self {
-            id: row.get("id"),
+            id: row.get::<_, i64>("id"),
             code: row.get("code"),
             long_url: row.get("long_url"),
             expires_at: row.get("expires_at"),

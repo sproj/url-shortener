@@ -16,7 +16,7 @@ pub async fn list(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
 pub async fn add(long_url: String, state: SharedState) -> RepositoryResult<ShortUrl> {
     let dto = ShortUrlDto {
         code: bs58::encode(&long_url).into_string(),
-        long_url: long_url,
+        long_url,
         expires_at: None,
     };
 
