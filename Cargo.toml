@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum = { version = "0.8" }
+bs58 = "0.5.1"
 chrono = { version = "0.4.43", features = ["serde"] }
 deadpool-postgres = "0.14.1"
 dotenvy = "0.15.7"
