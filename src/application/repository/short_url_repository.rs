@@ -2,7 +2,7 @@ use tokio_postgres::types::{ToSql, Type};
 
 use crate::{
     application::{repository::RepositoryResult, state::SharedState},
-    domain::models::short_url::{ShortUrl, ShortUrlDto},
+    domain::models::short_url::{CreateShortUrlDto, ShortUrl},
 };
 
 pub async fn list(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
@@ -10,11 +10,13 @@ pub async fn list(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
 
     let rows = client.query("SELECT * from short_url", &[]).await?;
 
-    Ok(rows.into_iter().map(ShortUrl::from).collect())
+    rows.into_iter()
+        .map(ShortUrl::try_from)
+        .collect::<Result<Vec<_>, _>>()
 }
 
 pub async fn add(long_url: String, state: SharedState) -> RepositoryResult<ShortUrl> {
-    let dto = ShortUrlDto {
+    let dto = CreateShortUrlDto {
         code: bs58::encode(&long_url).into_string(),
         long_url,
         expires_at: None,
@@ -34,5 +36,5 @@ pub async fn add(long_url: String, state: SharedState) -> RepositoryResult<Short
 
     let row = client.query_one(&statement, params).await?;
 
-    Ok(row.into())
+    Ok(row.try_into()?)
 }

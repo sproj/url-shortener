@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use tokio_postgres::Row;
 
-#[derive(Debug, Clone, serde::Serialize)]
+use crate::application::repository::database_error::DatabaseError;
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ShortUrl {
     pub id: i64,
     pub code: String,
@@ -18,21 +21,43 @@ impl ShortUrl {
     }
 }
 
-impl From<Row> for ShortUrl {
-    fn from(row: Row) -> Self {
-        Self {
-            id: row.get::<_, i64>("id"),
-            code: row.get("code"),
-            long_url: row.get("long_url"),
-            expires_at: row.get("expires_at"),
-            created_at: row.get("created_at"),
-            updated_at: row.get("updated_at"),
-            deleted_at: row.get("deleted_at"),
-        }
+impl TryFrom<Row> for ShortUrl {
+    type Error = DatabaseError;
+    fn try_from(row: Row) -> Result<Self, Self::Error> {
+        Self::try_from(&row)
     }
 }
 
-pub struct ShortUrlDto {
+impl TryFrom<&Row> for ShortUrl {
+    type Error = DatabaseError;
+    fn try_from(row: &Row) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: row
+                .try_get::<_, i64>("id")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            code: row
+                .try_get("code")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            long_url: row
+                .try_get("long_url")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            expires_at: row
+                .try_get("expires_at")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            created_at: row
+                .try_get("created_at")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            updated_at: row
+                .try_get("updated_at")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            deleted_at: row
+                .try_get("deleted_at")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+        })
+    }
+}
+
+pub struct CreateShortUrlDto {
     pub code: String,
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
