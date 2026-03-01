@@ -5,7 +5,9 @@ use std::time::Duration;
 use tokio::time::Instant;
 use url_shortener::{
     api::server,
-    application::{app::build, config::Config, startup_error::StartupError},
+    application::{
+        self, app::build, config::Config, startup_error::StartupError, state::SharedState,
+    },
 };
 
 use crate::common::{
@@ -14,6 +16,7 @@ use crate::common::{
 };
 
 pub struct TestApp {
+    pub state: SharedState,
     socket_address: SocketAddr,
     _db: Arc<SharedTestDb>,
 }
@@ -52,17 +55,22 @@ pub async fn spawn_with_config(config: Config, db: Arc<SharedTestDb>) -> TestApp
     let addr = listener.local_addr().unwrap();
     dbg!(format!("test_app will listen on port: {}", &addr));
 
-    tokio::spawn(server::serve(listener, state));
+    tokio::spawn(server::serve(listener, state.clone()));
 
     let sut = TestApp {
         socket_address: addr,
         _db: db,
+        state,
     };
 
     let healthz = sut.build_path(constants::API_PATH_HEALTH);
     wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
 
     sut
+}
+
+pub async fn migrate_test_db(state: &Arc<application::state::AppState>) {
+    application::app::migrate(state).await.unwrap();
 }
 
 async fn wait_for_service(duration: Duration, url: &str) {
