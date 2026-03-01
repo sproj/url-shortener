@@ -14,16 +14,14 @@ async fn create_short_from_input_succeeds() {
 
     let client = reqwest::Client::new();
 
-    let res = client
-        .post(url)
-        .json("http://create_this_you_casual.com")
-        // .header("content-type", "application/json")
-        // .body("http://test.com")
-        .send()
-        .await
-        .unwrap();
+    let expected = "http://create.me";
+
+    let res = client.post(url).json(expected).send().await.unwrap();
 
     assert_eq!(res.status(), StatusCode::CREATED);
+
+    let actual = res.json::<ShortUrl>().await.unwrap();
+    assert_eq!(actual.long_url, expected)
 }
 
 #[tokio::test]
@@ -32,28 +30,60 @@ async fn get_after_create_succeeds() {
 
     test_app::migrate_test_db(&sut.state).await;
 
-    let url = sut.build_path(API_PATH_SHORTEN);
-
+    let create_url = sut.build_path(API_PATH_SHORTEN);
     let client = reqwest::Client::new();
 
     let expected = "http://read.me";
 
     let create = client
-        .post(url.clone())
+        .post(create_url)
         .json(&expected)
-        // .header("content-type", "application/json")
-        // .body("http://test.com")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+    let create_result = create.json::<ShortUrl>().await.unwrap();
+    let created_id = create_result.id;
+    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created_id).as_str());
+
+    let read = client.get(get_by_id_url).send().await.unwrap();
+
+    assert_eq!(read.status(), StatusCode::OK);
+
+    let actual = read.json::<ShortUrl>().await.unwrap();
+
+    assert_eq!(actual.long_url, expected)
+}
+
+#[tokio::test]
+async fn delete_by_id_succeeds() {
+    let sut = test_app::spawn().await;
+
+    test_app::migrate_test_db(&sut.state).await;
+
+    let create_url = sut.build_path(API_PATH_SHORTEN);
+    let client = reqwest::Client::new();
+
+    let expected = "http://delete.me";
+
+    let create = client
+        .post(create_url)
+        .json(&expected)
         .send()
         .await
         .unwrap();
 
     assert_eq!(create.status(), StatusCode::CREATED);
 
-    let read = client.get(url).send().await.unwrap();
+    let actual = create.json::<ShortUrl>().await.unwrap();
+    let url_with_id_path_param =
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN, actual.id).as_str());
 
-    assert_eq!(read.status(), StatusCode::OK);
+    let delete = client.delete(url_with_id_path_param).send().await.unwrap();
 
-    let short_result = read.json::<Vec<ShortUrl>>().await.unwrap();
+    assert_eq!(delete.status(), StatusCode::OK);
 
-    assert!(short_result.iter().any(|short| short.long_url == expected))
+    let delete_response = delete.json::<bool>().await.unwrap();
+    assert_eq!(delete_response, true);
 }

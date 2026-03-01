@@ -7,6 +7,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result};
 
+use crate::application::repository::database_error::DatabaseError;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiErrorKind {
@@ -61,6 +63,21 @@ impl ApiError {
             ..Default::default()
         }
     }
+
+    pub fn message(mut self, message: &str) -> Self {
+        self.message = message.to_owned();
+        self
+    }
+    pub fn kind(mut self, kind: ApiErrorKind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    pub fn detail(mut self, detail: serde_json::Value) -> Self {
+        self.detail = Some(detail);
+        self
+    }
+    
 }
 
 impl Display for ApiError {
@@ -71,6 +88,17 @@ impl Display for ApiError {
 }
 
 impl std::error::Error for ApiError {}
+
+impl From<DatabaseError> for ApiError {
+    fn from(error: DatabaseError) -> Self {
+        eprintln!("Database error: {:?}", error);
+        Self {
+            message: "database operation failed".to_string(),
+            kind: ApiErrorKind::Internal,
+            detail: None,
+        }
+    }
+}
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {

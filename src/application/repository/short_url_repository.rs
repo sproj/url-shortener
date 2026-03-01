@@ -1,3 +1,4 @@
+use deadpool_postgres::GenericClient;
 use tokio_postgres::types::{ToSql, Type};
 
 use crate::{
@@ -5,17 +6,28 @@ use crate::{
     domain::models::short_url::{CreateShortUrlDto, ShortUrl},
 };
 
-pub async fn list(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
+pub async fn get_all(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
     let client = state.db_pool.get().await?;
 
-    let rows = client.query("SELECT * from short_url", &[]).await?;
+    let rows = client.query("SELECT id, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url", &[]).await?;
 
     rows.into_iter()
         .map(ShortUrl::try_from)
         .collect::<Result<Vec<_>, _>>()
 }
 
-pub async fn add(long_url: String, state: SharedState) -> RepositoryResult<ShortUrl> {
+pub async fn get_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<ShortUrl>> {
+    state
+        .db_pool
+        .get()
+        .await?
+        .query_opt("SELECT id, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE id = $1", &[&id])
+        .await?
+        .map(ShortUrl::try_from)
+        .transpose()
+}
+
+pub async fn add_one(state: SharedState, long_url: String) -> RepositoryResult<ShortUrl> {
     let dto = CreateShortUrlDto {
         code: bs58::encode(&long_url).into_string(),
         long_url,
@@ -36,5 +48,20 @@ pub async fn add(long_url: String, state: SharedState) -> RepositoryResult<Short
 
     let row = client.query_one(&statement, params).await?;
 
-    Ok(row.try_into()?)
+    row.try_into()
+}
+
+pub async fn delete_one_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<bool>> {
+    let client = state.db_pool.get().await?;
+
+    let delete_statement = client
+        .prepare("DELETE from short_url WHERE id = $1")
+        .await?;
+
+    let deleted_count = client.execute(&delete_statement, &[&id]).await?;
+    if deleted_count == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(true))
+    }
 }
