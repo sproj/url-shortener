@@ -17,6 +17,7 @@ pub async fn get_all(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
 }
 
 pub async fn get_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<ShortUrl>> {
+    println!("short url_repository::get_by_id called with {}", id);
     state
         .db_pool
         .get()
@@ -28,6 +29,7 @@ pub async fn get_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<S
 }
 
 pub async fn add_one(state: SharedState, long_url: String) -> RepositoryResult<ShortUrl> {
+    println!("short url_repository::add_one called with {}", long_url);
     let dto = CreateShortUrlDto {
         code: bs58::encode(&long_url).into_string(),
         long_url,
@@ -52,6 +54,7 @@ pub async fn add_one(state: SharedState, long_url: String) -> RepositoryResult<S
 }
 
 pub async fn delete_one_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<bool>> {
+    println!("short url_repository::delete_one_by_id called with {}", id);
     let client = state.db_pool.get().await?;
 
     let delete_statement = client

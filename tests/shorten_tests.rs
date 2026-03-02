@@ -5,7 +5,7 @@ use url_shortener::domain::models::short_url::ShortUrl;
 pub mod common;
 
 #[tokio::test]
-async fn create_short_from_input_succeeds() {
+async fn create_shorturl_from_input_succeeds() {
     let sut = test_app::spawn().await;
 
     test_app::migrate_test_db(&sut.state).await;
@@ -25,7 +25,7 @@ async fn create_short_from_input_succeeds() {
 }
 
 #[tokio::test]
-async fn get_after_create_succeeds() {
+async fn get_after_create_shorturl_succeeds() {
     let sut = test_app::spawn().await;
 
     test_app::migrate_test_db(&sut.state).await;
@@ -57,13 +57,12 @@ async fn get_after_create_succeeds() {
 }
 
 #[tokio::test]
-async fn delete_by_id_succeeds() {
+async fn delete_shorturl_by_id_succeeds() {
     let sut = test_app::spawn().await;
-
     test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
 
     let create_url = sut.build_path(API_PATH_SHORTEN);
-    let client = reqwest::Client::new();
 
     let expected = "http://delete.me";
 
@@ -86,4 +85,32 @@ async fn delete_by_id_succeeds() {
 
     let delete_response = delete.json::<bool>().await.unwrap();
     assert_eq!(delete_response, true);
+}
+
+#[tokio::test]
+async fn get_shorturl_by_nosuch_id_returns_404() {
+    let sut = test_app::spawn().await;
+    test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
+
+    let no_such_id = -1;
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
+
+    let res = client.get(url).send().await.unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn delete_shorturl_by_nosuch_id_returns_404() {
+    let sut = test_app::spawn().await;
+    test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
+
+    let no_such_id = -1;
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
+
+    let res = client.delete(url).send().await.unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
