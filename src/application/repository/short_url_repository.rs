@@ -3,7 +3,7 @@ use tokio_postgres::types::{ToSql, Type};
 
 use crate::{
     application::{repository::RepositoryResult, state::SharedState},
-    domain::models::short_url::{CreateShortUrlDto, ShortUrl},
+    domain::models::short_url::{CreateShortUrlResponseDto, ShortUrl},
 };
 
 pub async fn get_all(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
@@ -30,7 +30,7 @@ pub async fn get_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<S
 
 pub async fn add_one(state: SharedState, long_url: String) -> RepositoryResult<ShortUrl> {
     println!("short url_repository::add_one called with {}", long_url);
-    let dto = CreateShortUrlDto {
+    let dto = CreateShortUrlResponseDto {
         code: bs58::encode(&long_url).into_string(),
         long_url,
         expires_at: None,

@@ -2,7 +2,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
 
-use crate::application::repository::database_error::DatabaseError;
+use crate::{
+    api::handlers::short_url_handlers::ShortUrlError,
+    application::repository::database_error::DatabaseError,
+    domain::validation_issue::{ValidationIssue, ValidationRule},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortUrl {
@@ -57,8 +61,96 @@ impl TryFrom<&Row> for ShortUrl {
     }
 }
 
+#[derive(Deserialize, Debug, Clone)]
 pub struct CreateShortUrlDto {
+    pub long_url: String,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct CreateShortUrlResponseDto {
     pub code: String,
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+impl CreateShortUrlDto {
+    pub fn validate(&self) -> Result<(), ShortUrlError> {
+        let input = self.long_url.trim();
+
+        if input.len() > 2048 {
+            return Err(ShortUrlError::UnprocessableInput(
+                "2048 characters for a url is too many characters".to_string(),
+            ));
+        }
+        if input.is_empty() {
+            return Err(ShortUrlError::UnprocessableInput(
+                "empty string is not a valid url".to_string(),
+            ));
+        }
+
+        let mut issues = Vec::new();
+        if let Some(time) = self.expires_at {
+            cannot_expire_in_the_past(&time, &mut issues);
+        }
+
+        let url = url::Url::try_from(input)
+            .map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
+
+        let url_rules: &[ValidationRule<url::Url>] =
+            &[scheme_must_be_hypertext, host_must_be_present, no_passwords];
+
+        for rule in url_rules {
+            rule(&url, &mut issues);
+        }
+
+        if issues.is_empty() {
+            Ok(())
+        } else {
+            Err(ShortUrlError::InvalidLongUrl(issues))
+        }
+    }
+}
+
+fn scheme_must_be_hypertext(url: &url::Url, out: &mut Vec<ValidationIssue>) {
+    let scheme = url.scheme();
+    if !(scheme == "http" || scheme == "https") {
+        let issue = ValidationIssue {
+            field: "long_url",
+            code: "dur?",
+            message: "scheme must be `http` or `https`".to_string(),
+        };
+        out.push(issue);
+    }
+}
+fn host_must_be_present(url: &url::Url, out: &mut Vec<ValidationIssue>) {
+    if url.host().is_none() {
+        let issue = ValidationIssue {
+            field: "long_url",
+            code: "dur?",
+            message: "url must have a host".to_string(),
+        };
+        out.push(issue);
+    }
+}
+fn no_passwords(url: &url::Url, out: &mut Vec<ValidationIssue>) {
+    if url.password().is_some() {
+        let issue = ValidationIssue {
+            field: "long_url",
+            code: "dur?",
+            message: "directing traffic to a url containing a password is foolish and forbidden and you should feel bad about it".to_string(),
+        };
+        out.push(issue);
+    }
+}
+fn cannot_expire_in_the_past(input_expiry: &DateTime<Utc>, out: &mut Vec<ValidationIssue>) {
+    if input_expiry < &Utc::now() {
+        let issue = ValidationIssue {
+            field: "expires_at",
+            code: "dur?",
+            message: "cannot set expiry in the past".to_string(),
+        };
+
+        out.push(issue)
+    }
 }

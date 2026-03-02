@@ -12,7 +12,10 @@ use crate::{
         repository::{database_error::DatabaseError, short_url_repository},
         state::SharedState,
     },
-    domain::models::short_url::ShortUrl,
+    domain::{
+        models::short_url::{CreateShortUrlDto, ShortUrl},
+        validation_issue::ValidationIssue,
+    },
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
@@ -38,10 +41,11 @@ pub async fn get_one_by_id(
 
 pub async fn add_one(
     State(state): State<SharedState>,
-    Json(input_url): Json<String>,
+    Json(dto): Json<CreateShortUrlDto>,
 ) -> Result<impl IntoResponse, ApiError> {
-    println!("shorturl_handler::add_one called with {}", input_url);
-    let created = short_url_repository::add_one(state, input_url).await?;
+    println!("shorturl_handler::add_one called with {}", dto.long_url);
+    dto.validate()?;
+    let created = short_url_repository::add_one(state, dto.long_url).await?;
     println!("shorturl_handler::add_one returning Ok");
     Ok((StatusCode::CREATED, Json(created)))
 }
@@ -64,8 +68,10 @@ pub async fn delete_one_by_id(
 pub enum ShortUrlError {
     #[error("short_url not found: {0}")] // todo: I do not get how this macro works
     NotFound(i64), // todo: short_url should have a uuid so the database id is not exposed
-    #[error("invalid input url: {0}")]
-    InvalidLongUrl(String),
+    #[error("invalid input: {0}")]
+    UnprocessableInput(String),
+    #[error("invalid input url: {0:?}")]
+    InvalidLongUrl(Vec<ValidationIssue>),
     #[error("data layer error: {0}")]
     Storage(DatabaseError),
 }
@@ -90,6 +96,9 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::NotFound(id) => ApiError::new(short_url_error_message)
                 .kind(ApiErrorKind::ResourceNotFound)
                 .detail(serde_json::json!({ "short_url_id": id })),
+            ShortUrlError::UnprocessableInput(msg) => ApiError::new(short_url_error_message)
+                .kind(ApiErrorKind::ValidationError)
+                .detail(serde_json::json!({"detail": msg})),
             ShortUrlError::InvalidLongUrl(long) => ApiError::new(short_url_error_message)
                 .kind(ApiErrorKind::ValidationError)
                 .detail(serde_json::json!({"invalid url": long})),

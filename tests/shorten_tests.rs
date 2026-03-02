@@ -14,9 +14,13 @@ async fn create_shorturl_from_input_succeeds() {
 
     let client = reqwest::Client::new();
 
-    let expected = "http://create.me";
+    let expected = "http://create.me".to_string();
+    let input = serde_json::json!( {
+        "long_url": expected,
+        "expires_at": null,
+    });
 
-    let res = client.post(url).json(expected).send().await.unwrap();
+    let res = client.post(url).json(&input).send().await.unwrap();
 
     assert_eq!(res.status(), StatusCode::CREATED);
 
@@ -34,13 +38,12 @@ async fn get_after_create_shorturl_succeeds() {
     let client = reqwest::Client::new();
 
     let expected = "http://read.me";
+    let input = serde_json::json!( {
+        "long_url": "http://read.me".to_string(),
+        "expires_at": null,
+    });
 
-    let create = client
-        .post(create_url)
-        .json(&expected)
-        .send()
-        .await
-        .unwrap();
+    let create = client.post(create_url).json(&input).send().await.unwrap();
 
     assert_eq!(create.status(), StatusCode::CREATED);
     let create_result = create.json::<ShortUrl>().await.unwrap();
@@ -65,13 +68,12 @@ async fn delete_shorturl_by_id_succeeds() {
     let create_url = sut.build_path(API_PATH_SHORTEN);
 
     let expected = "http://delete.me";
+    let input = serde_json::json!( {
+        "long_url": expected.to_string(),
+        "expires_at": null,
+    });
 
-    let create = client
-        .post(create_url)
-        .json(&expected)
-        .send()
-        .await
-        .unwrap();
+    let create = client.post(create_url).json(&input).send().await.unwrap();
 
     assert_eq!(create.status(), StatusCode::CREATED);
 
