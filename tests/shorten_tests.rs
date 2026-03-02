@@ -5,7 +5,7 @@ use url_shortener::domain::models::short_url::ShortUrl;
 pub mod common;
 
 #[tokio::test]
-async fn create_short_from_input_succeeds() {
+async fn create_shorturl_from_input_succeeds() {
     let sut = test_app::spawn().await;
 
     test_app::migrate_test_db(&sut.state).await;
@@ -14,9 +14,13 @@ async fn create_short_from_input_succeeds() {
 
     let client = reqwest::Client::new();
 
-    let expected = "http://create.me";
+    let expected = "http://create.me".to_string();
+    let input = serde_json::json!( {
+        "long_url": expected,
+        "expires_at": null,
+    });
 
-    let res = client.post(url).json(expected).send().await.unwrap();
+    let res = client.post(url).json(&input).send().await.unwrap();
 
     assert_eq!(res.status(), StatusCode::CREATED);
 
@@ -25,7 +29,7 @@ async fn create_short_from_input_succeeds() {
 }
 
 #[tokio::test]
-async fn get_after_create_succeeds() {
+async fn get_after_create_shorturl_succeeds() {
     let sut = test_app::spawn().await;
 
     test_app::migrate_test_db(&sut.state).await;
@@ -34,13 +38,12 @@ async fn get_after_create_succeeds() {
     let client = reqwest::Client::new();
 
     let expected = "http://read.me";
+    let input = serde_json::json!( {
+        "long_url": "http://read.me".to_string(),
+        "expires_at": null,
+    });
 
-    let create = client
-        .post(create_url)
-        .json(&expected)
-        .send()
-        .await
-        .unwrap();
+    let create = client.post(create_url).json(&input).send().await.unwrap();
 
     assert_eq!(create.status(), StatusCode::CREATED);
     let create_result = create.json::<ShortUrl>().await.unwrap();
@@ -57,22 +60,20 @@ async fn get_after_create_succeeds() {
 }
 
 #[tokio::test]
-async fn delete_by_id_succeeds() {
+async fn delete_shorturl_by_id_succeeds() {
     let sut = test_app::spawn().await;
-
     test_app::migrate_test_db(&sut.state).await;
-
-    let create_url = sut.build_path(API_PATH_SHORTEN);
     let client = reqwest::Client::new();
 
-    let expected = "http://delete.me";
+    let create_url = sut.build_path(API_PATH_SHORTEN);
 
-    let create = client
-        .post(create_url)
-        .json(&expected)
-        .send()
-        .await
-        .unwrap();
+    let expected = "http://delete.me";
+    let input = serde_json::json!( {
+        "long_url": expected.to_string(),
+        "expires_at": null,
+    });
+
+    let create = client.post(create_url).json(&input).send().await.unwrap();
 
     assert_eq!(create.status(), StatusCode::CREATED);
 
@@ -86,4 +87,32 @@ async fn delete_by_id_succeeds() {
 
     let delete_response = delete.json::<bool>().await.unwrap();
     assert_eq!(delete_response, true);
+}
+
+#[tokio::test]
+async fn get_shorturl_by_nosuch_id_returns_404() {
+    let sut = test_app::spawn().await;
+    test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
+
+    let no_such_id = -1;
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
+
+    let res = client.get(url).send().await.unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn delete_shorturl_by_nosuch_id_returns_404() {
+    let sut = test_app::spawn().await;
+    test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
+
+    let no_such_id = -1;
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
+
+    let res = client.delete(url).send().await.unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
