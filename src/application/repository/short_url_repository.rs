@@ -3,7 +3,7 @@ use tokio_postgres::types::{ToSql, Type};
 
 use crate::{
     application::{repository::RepositoryResult, state::SharedState},
-    domain::models::short_url::{CreateShortUrlResponseDto, ShortUrl},
+    domain::models::short_url::{NewShortUrlDto, ShortUrl},
 };
 
 pub async fn get_all(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
@@ -28,25 +28,22 @@ pub async fn get_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<S
         .transpose()
 }
 
-pub async fn add_one(state: SharedState, long_url: String) -> RepositoryResult<ShortUrl> {
-    println!("short url_repository::add_one called with {}", long_url);
-    let dto = CreateShortUrlResponseDto {
-        code: bs58::encode(&long_url).into_string(),
-        long_url,
-        expires_at: None,
-    };
+pub async fn add_one(state: SharedState, dto: NewShortUrlDto) -> RepositoryResult<ShortUrl> {
+    println!("short url_repository::add_one called with {:?}", dto);
 
     let client = state.db_pool.get().await?;
 
     let statement = client
         .prepare_typed(
             "INSERT INTO short_url (code, long_url, expires_at) \
-            VALUES ($1, $2, $3) \
-            RETURNING id, code, long_url, expires_at, created_at, updated_at, deleted_at",
+        VALUES ($1, $2, $3) \
+        RETURNING id, code, long_url, expires_at, created_at, updated_at, deleted_at",
             &[Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ],
         )
         .await?;
-    let params: &[&(dyn ToSql + Sync); 3] = &[&dto.code, &dto.long_url, &dto.expires_at];
+
+    let code = bs58::encode(&dto.long_url).into_string();
+    let params: &[&(dyn ToSql + Sync); 3] = &[&code, &dto.long_url, &dto.expires_at];
 
     let row = client.query_one(&statement, params).await?;
 

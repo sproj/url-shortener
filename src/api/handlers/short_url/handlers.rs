@@ -1,0 +1,68 @@
+use axum::{
+    Json,
+    extract::{Path, State},
+};
+use hyper::StatusCode;
+
+use crate::{
+    api::{
+        error::ApiError,
+        handlers::short_url::{
+            ShortUrlError, create_short_url_request::CreateShortUrlRequest,
+            create_short_url_response::CreateShortUrlResponse,
+        },
+    },
+    application::{repository::short_url_repository, state::SharedState},
+    domain::models::short_url::{NewShortUrlDto, ShortUrl},
+};
+
+pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
+    println!("shorturl_handler::get_all called");
+    let short_urls = short_url_repository::get_all(state).await?;
+    println!("shorturl_handler::get_all returning");
+    Ok(Json(short_urls))
+}
+
+pub async fn get_one_by_id(
+    State(state): State<SharedState>,
+    Path(id): Path<i64>,
+) -> Result<Json<ShortUrl>, ApiError> {
+    println!("shorturl_handler::get_one_by_id called with {}", id);
+    if let Some(short) = short_url_repository::get_by_id(state, id).await? {
+        println!("shorturl_handler::get_one_by_id returning Ok");
+        Ok(Json(short))
+    } else {
+        eprintln!("shorturl_handler::get_one_by_id returning ShortUrlError");
+        Err(ApiError::from(ShortUrlError::NotFound(id)))
+    }
+}
+
+pub async fn add_one(
+    State(state): State<SharedState>,
+    Json(req_payload): Json<CreateShortUrlRequest>,
+) -> Result<(StatusCode, Json<CreateShortUrlResponse>), ApiError> {
+    println!("shorturl_handler::add_one called with {:?}", req_payload);
+    let dto: NewShortUrlDto = req_payload.try_into()?;
+
+    let created = short_url_repository::add_one(state, dto).await?;
+    println!("shorturl_handler::add_one created: {:?}", created);
+
+    let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
+    println!("shorturl_handler::add_one returning Ok: {:?}", payload);
+
+    Ok((StatusCode::CREATED, Json(payload)))
+}
+
+pub async fn delete_one_by_id(
+    State(state): State<SharedState>,
+    Path(id): Path<i64>,
+) -> Result<Json<bool>, ApiError> {
+    println!("shorturl_handler::delete_one called with {}", id);
+    if let Some(deleted_count) = short_url_repository::delete_one_by_id(state, id).await? {
+        println!("shorturl_handler::delete_one returning Ok");
+        Ok(Json(deleted_count))
+    } else {
+        eprintln!("shorturl_handler::delete_one returning ShortUrlError");
+        Err(ApiError::from(ShortUrlError::NotFound(id)))
+    }
+}
