@@ -1,6 +1,6 @@
 use crate::common::{constants::API_PATH_SHORTEN, test_app};
 use hyper::StatusCode;
-use url_shortener::domain::models::short_url::CreateShortUrlResponse;
+use url_shortener::api::handlers::short_url::CreateShortUrlResponse;
 
 pub mod common;
 

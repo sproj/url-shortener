@@ -4,7 +4,7 @@ use axum::{
 };
 
 use crate::{
-    api::handlers::short_url_handlers::{add_one, delete_one_by_id, get_all, get_one_by_id},
+    api::handlers::short_url::{add_one, delete_one_by_id, get_all, get_one_by_id},
     application::state::SharedState,
 };
 
