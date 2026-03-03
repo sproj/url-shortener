@@ -1,6 +1,6 @@
 use crate::common::{constants::API_PATH_SHORTEN, test_app};
 use hyper::StatusCode;
-use url_shortener::domain::models::short_url::ShortUrl;
+use url_shortener::domain::models::short_url::CreateShortUrlResponse;
 
 pub mod common;
 
@@ -24,7 +24,7 @@ async fn create_shorturl_from_input_succeeds() {
 
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let actual = res.json::<ShortUrl>().await.unwrap();
+    let actual = res.json::<CreateShortUrlResponse>().await.unwrap();
     assert_eq!(actual.long_url, expected)
 }
 
@@ -46,15 +46,15 @@ async fn get_after_create_shorturl_succeeds() {
     let create = client.post(create_url).json(&input).send().await.unwrap();
 
     assert_eq!(create.status(), StatusCode::CREATED);
-    let create_result = create.json::<ShortUrl>().await.unwrap();
-    let created_id = create_result.id;
-    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created_id).as_str());
+    let created = create.json::<CreateShortUrlResponse>().await.unwrap();
+
+    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.id).as_str());
 
     let read = client.get(get_by_id_url).send().await.unwrap();
 
     assert_eq!(read.status(), StatusCode::OK);
 
-    let actual = read.json::<ShortUrl>().await.unwrap();
+    let actual = read.json::<CreateShortUrlResponse>().await.unwrap();
 
     assert_eq!(actual.long_url, expected)
 }
@@ -77,9 +77,9 @@ async fn delete_shorturl_by_id_succeeds() {
 
     assert_eq!(create.status(), StatusCode::CREATED);
 
-    let actual = create.json::<ShortUrl>().await.unwrap();
+    let created = create.json::<CreateShortUrlResponse>().await.unwrap();
     let url_with_id_path_param =
-        sut.build_path(format!("{}/{}", API_PATH_SHORTEN, actual.id).as_str());
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.id).as_str());
 
     let delete = client.delete(url_with_id_path_param).send().await.unwrap();
 

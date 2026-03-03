@@ -1,7 +1,6 @@
 use axum::{
     Json,
     extract::{Path, State},
-    response::IntoResponse,
 };
 use hyper::StatusCode;
 use thiserror::Error;
@@ -13,7 +12,7 @@ use crate::{
         state::SharedState,
     },
     domain::{
-        models::short_url::{CreateShortUrlDto, ShortUrl},
+        models::short_url::{CreateShortUrlRequest, CreateShortUrlResponse, NewShortUrlDto, ShortUrl},
         validation_issue::ValidationIssue,
     },
 };
@@ -41,13 +40,18 @@ pub async fn get_one_by_id(
 
 pub async fn add_one(
     State(state): State<SharedState>,
-    Json(dto): Json<CreateShortUrlDto>,
-) -> Result<impl IntoResponse, ApiError> {
-    println!("shorturl_handler::add_one called with {}", dto.long_url);
-    dto.validate()?;
-    let created = short_url_repository::add_one(state, dto.long_url).await?;
-    println!("shorturl_handler::add_one returning Ok");
-    Ok((StatusCode::CREATED, Json(created)))
+    Json(req_payload): Json<CreateShortUrlRequest>,
+) -> Result<(StatusCode, Json<CreateShortUrlResponse>), ApiError> {
+    println!("shorturl_handler::add_one called with {:?}", req_payload);
+    let dto: NewShortUrlDto = req_payload.try_into()?;
+
+    let created = short_url_repository::add_one(state, dto).await?;
+    println!("shorturl_handler::add_one created: {:?}", created);
+
+    let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
+    println!("shorturl_handler::add_one returning Ok: {:?}", payload);
+
+    Ok((StatusCode::CREATED, Json(payload)))
 }
 
 pub async fn delete_one_by_id(

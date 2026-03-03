@@ -39,6 +39,9 @@ pub async fn spawn() -> TestApp {
     config.db.postgres_user = db.user.clone();
     config.db.postgres_password = db.password.clone();
 
+    // hoom hum: .env.test should include this but force the issue so you don't make mistakes such as `ENT_TEST=1 cargo test`.
+    config.service_port = 0;
+
     spawn_with_config(config, db).await
 }
 
