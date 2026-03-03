@@ -1,2 +1,2 @@
-pub mod hello_world_handlers;
-pub mod short_url_handlers;
+pub mod hello_world;
+pub mod short_url;

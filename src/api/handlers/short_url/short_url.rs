@@ -3,18 +3,17 @@ use axum::{
     extract::{Path, State},
 };
 use hyper::StatusCode;
-use thiserror::Error;
 
 use crate::{
-    api::error::{ApiError, ApiErrorKind},
-    application::{
-        repository::{database_error::DatabaseError, short_url_repository},
-        state::SharedState,
+    api::{
+        error::ApiError,
+        handlers::short_url::{
+            ShortUrlError, create_short_url_request::CreateShortUrlRequest,
+            create_short_url_response::CreateShortUrlResponse,
+        },
     },
-    domain::{
-        models::short_url::{CreateShortUrlRequest, CreateShortUrlResponse, NewShortUrlDto, ShortUrl},
-        validation_issue::ValidationIssue,
-    },
+    application::{repository::short_url_repository, state::SharedState},
+    domain::models::short_url::{NewShortUrlDto, ShortUrl},
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
@@ -65,50 +64,5 @@ pub async fn delete_one_by_id(
     } else {
         eprintln!("shorturl_handler::delete_one returning ShortUrlError");
         Err(ApiError::from(ShortUrlError::NotFound(id)))
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum ShortUrlError {
-    #[error("short_url not found: {0}")] // todo: I do not get how this macro works
-    NotFound(i64), // todo: short_url should have a uuid so the database id is not exposed
-    #[error("invalid input: {0}")]
-    UnprocessableInput(String),
-    #[error("invalid input url: {0:?}")]
-    InvalidLongUrl(Vec<ValidationIssue>),
-    #[error("data layer error: {0}")]
-    Storage(DatabaseError),
-}
-
-impl From<DatabaseError> for ShortUrlError {
-    fn from(e: DatabaseError) -> Self {
-        Self::Storage(e)
-    }
-}
-
-impl From<ShortUrlError> for ApiError {
-    fn from(short_url_error: ShortUrlError) -> Self {
-        ApiError::from(&short_url_error)
-    }
-}
-
-impl From<&ShortUrlError> for ApiError {
-    fn from(short_url_error: &ShortUrlError) -> Self {
-        let short_url_error_message = &short_url_error.to_string();
-        eprintln!("ShortUrlError: {:?}", &short_url_error);
-        match short_url_error {
-            ShortUrlError::NotFound(id) => ApiError::new(short_url_error_message)
-                .kind(ApiErrorKind::ResourceNotFound)
-                .detail(serde_json::json!({ "short_url_id": id })),
-            ShortUrlError::UnprocessableInput(msg) => ApiError::new(short_url_error_message)
-                .kind(ApiErrorKind::ValidationError)
-                .detail(serde_json::json!({"detail": msg})),
-            ShortUrlError::InvalidLongUrl(long) => ApiError::new(short_url_error_message)
-                .kind(ApiErrorKind::ValidationError)
-                .detail(serde_json::json!({"invalid url": long})),
-            ShortUrlError::Storage(_e) => {
-                ApiError::new("internal database error").kind(ApiErrorKind::Internal)
-            }
-        }
     }
 }

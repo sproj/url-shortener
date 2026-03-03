@@ -77,7 +77,6 @@ impl ApiError {
         self.detail = Some(detail);
         self
     }
-    
 }
 
 impl Display for ApiError {
