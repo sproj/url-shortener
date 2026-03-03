@@ -43,7 +43,7 @@ impl From<&ShortUrlError> for ApiError {
                 .detail(serde_json::json!({"detail": msg})),
             ShortUrlError::InvalidLongUrl(issues) => ApiError::new("input url is invalid")
                 .kind(ApiErrorKind::ValidationError)
-                .detail(serde_json::json!({"invalid url": issues})),
+                .detail(serde_json::json!({"invalid_input_url": issues})),
             ShortUrlError::Storage(_e) => {
                 ApiError::new("internal database error").kind(ApiErrorKind::Internal)
             }

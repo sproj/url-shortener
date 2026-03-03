@@ -62,7 +62,7 @@ fn scheme_must_be_hypertext(url: &url::Url, out: &mut Vec<ValidationIssue>) {
     if !(scheme == "http" || scheme == "https") {
         let issue = ValidationIssue {
             field: "long_url",
-            code: "dur?",
+            code: "scheme",
             message: "scheme must be `http` or `https`".to_string(),
         };
         out.push(issue);
@@ -72,7 +72,7 @@ fn host_must_be_present(url: &url::Url, out: &mut Vec<ValidationIssue>) {
     if url.host().is_none() {
         let issue = ValidationIssue {
             field: "long_url",
-            code: "dur?",
+            code: "host",
             message: "url must have a host".to_string(),
         };
         out.push(issue);
@@ -82,7 +82,7 @@ fn no_passwords(url: &url::Url, out: &mut Vec<ValidationIssue>) {
     if url.password().is_some() {
         let issue = ValidationIssue {
             field: "long_url",
-            code: "dur?",
+            code: "password",
             message: "directing traffic to a url containing a password is foolish and forbidden and you should feel bad about it".to_string(),
         };
         out.push(issue);
@@ -92,7 +92,7 @@ fn cannot_expire_in_the_past(input_expiry: &DateTime<Utc>, out: &mut Vec<Validat
     if input_expiry < &Utc::now() {
         let issue = ValidationIssue {
             field: "expires_at",
-            code: "dur?",
+            code: "in_past",
             message: "cannot set expiry in the past".to_string(),
         };
 
