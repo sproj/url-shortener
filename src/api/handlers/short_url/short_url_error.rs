@@ -38,12 +38,12 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::NotFound(id) => ApiError::new(short_url_error_message)
                 .kind(ApiErrorKind::ResourceNotFound)
                 .detail(serde_json::json!({ "short_url_id": id })),
-            ShortUrlError::UnprocessableInput(msg) => ApiError::new(short_url_error_message)
+            ShortUrlError::UnprocessableInput(msg) => ApiError::new("unprocessable input url")
                 .kind(ApiErrorKind::ValidationError)
                 .detail(serde_json::json!({"detail": msg})),
-            ShortUrlError::InvalidLongUrl(long) => ApiError::new(short_url_error_message)
+            ShortUrlError::InvalidLongUrl(issues) => ApiError::new("input url is invalid")
                 .kind(ApiErrorKind::ValidationError)
-                .detail(serde_json::json!({"invalid url": long})),
+                .detail(serde_json::json!({"invalid url": issues})),
             ShortUrlError::Storage(_e) => {
                 ApiError::new("internal database error").kind(ApiErrorKind::Internal)
             }
