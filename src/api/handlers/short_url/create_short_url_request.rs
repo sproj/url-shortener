@@ -20,26 +20,30 @@ impl TryFrom<CreateShortUrlRequest> for NewShortUrlDto {
     fn try_from(value: CreateShortUrlRequest) -> Result<Self, Self::Error> {
         let input: &str = value.long_url.trim();
 
-        if input.len() > 2048 {
-            return Err(ShortUrlError::UnprocessableInput(
-                "2048 characters for a url is too many characters".to_string(),
-            ));
-        }
-        if input.is_empty() {
-            return Err(ShortUrlError::UnprocessableInput(
-                "empty string is not a valid url".to_string(),
-            ));
+        let mut issues: Vec<ValidationIssue> = Vec::new();
+
+        for rule in URL_INPUT_VALIDATION_RULES {
+            rule(input, &mut issues);
         }
 
-        let mut issues: Vec<ValidationIssue> = Vec::new();
         if let Some(time) = value.expires_at {
             cannot_expire_in_the_past(&time, &mut issues);
         }
 
-        let url = url::Url::try_from(input)
-            .map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
+        // do not bother parsing and applying url validation issues to obviously crap input.
+        if !issues.is_empty() {
+            return Err(ShortUrlError::InvalidInput(issues));
+        }
 
-        for rule in URL_INPUT_VALIDATION_RULES {
+        let url = url::Url::parse(input).map_err(|e| {
+            ShortUrlError::InvalidInput(vec![ValidationIssue {
+                field: "long_url",
+                code: "parse_url",
+                message: e.to_string(),
+            }])
+        })?;
+
+        for rule in URL_VALIDATION_RULES {
             rule(&url, &mut issues);
         }
 
@@ -49,13 +53,40 @@ impl TryFrom<CreateShortUrlRequest> for NewShortUrlDto {
                 expires_at: value.expires_at,
             })
         } else {
-            Err(ShortUrlError::InvalidLongUrl(issues))
+            Err(ShortUrlError::InvalidInput(issues))
         }
     }
 }
 
-const URL_INPUT_VALIDATION_RULES: &[ValidationRule<url::Url>] =
-    &[scheme_must_be_hypertext, host_must_be_present, no_passwords];
+const URL_INPUT_VALIDATION_RULES: &[ValidationRule<str>] = &[
+    long_url_input_must_not_be_empty,
+    long_url_input_must_not_be_too_long,
+];
+const URL_VALIDATION_RULES: &[ValidationRule<url::Url>] = &[scheme_must_be_hypertext, no_passwords];
+
+fn long_url_input_must_not_be_empty(input: &str, out: &mut Vec<ValidationIssue>) {
+    if input.is_empty() {
+        let issue = ValidationIssue {
+            field: "long_url",
+            code: "empty",
+            message: "empty string is not a valid url".to_string(),
+        };
+
+        out.push(issue);
+    }
+}
+
+fn long_url_input_must_not_be_too_long(input: &str, out: &mut Vec<ValidationIssue>) {
+    if input.len() > 2048 {
+        let issue = ValidationIssue {
+            field: "long_url",
+            code: "too_long",
+            message: "more than 2048 characters for a url is too many characters".to_string(),
+        };
+
+        out.push(issue);
+    }
+}
 
 fn scheme_must_be_hypertext(url: &url::Url, out: &mut Vec<ValidationIssue>) {
     let scheme = url.scheme();
@@ -68,16 +99,7 @@ fn scheme_must_be_hypertext(url: &url::Url, out: &mut Vec<ValidationIssue>) {
         out.push(issue);
     }
 }
-fn host_must_be_present(url: &url::Url, out: &mut Vec<ValidationIssue>) {
-    if url.host().is_none() {
-        let issue = ValidationIssue {
-            field: "long_url",
-            code: "host",
-            message: "url must have a host".to_string(),
-        };
-        out.push(issue);
-    }
-}
+
 fn no_passwords(url: &url::Url, out: &mut Vec<ValidationIssue>) {
     if url.password().is_some() {
         let issue = ValidationIssue {
@@ -88,6 +110,7 @@ fn no_passwords(url: &url::Url, out: &mut Vec<ValidationIssue>) {
         out.push(issue);
     }
 }
+
 fn cannot_expire_in_the_past(input_expiry: &DateTime<Utc>, out: &mut Vec<ValidationIssue>) {
     if input_expiry < &Utc::now() {
         let issue = ValidationIssue {
