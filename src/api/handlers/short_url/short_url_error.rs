@@ -13,7 +13,7 @@ pub enum ShortUrlError {
     #[error("invalid input: {0}")]
     UnprocessableInput(String),
     #[error("invalid input url: {0:?}")]
-    InvalidLongUrl(Vec<ValidationIssue>),
+    InvalidInput(Vec<ValidationIssue>),
     #[error("data layer error: {0}")]
     Storage(DatabaseError),
 }
@@ -38,10 +38,15 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::NotFound(id) => ApiError::new(short_url_error_message)
                 .kind(ApiErrorKind::ResourceNotFound)
                 .detail(serde_json::json!({ "short_url_id": id })),
-            ShortUrlError::UnprocessableInput(msg) => ApiError::new("unprocessable input url")
-                .kind(ApiErrorKind::ValidationError)
-                .detail(serde_json::json!({"detail": msg})),
-            ShortUrlError::InvalidLongUrl(issues) => ApiError::new("input url is invalid")
+            ShortUrlError::UnprocessableInput(msg) => ApiError::new("unprocessable_input")
+                .kind(ApiErrorKind::UnprocessableInput)
+                .detail(serde_json::json!({"invalid_input_url": [{
+                        "field": "request_body",
+                        "code": "parse_create_short_url_input_fail",
+                        "message": msg
+                    }]
+                })),
+            ShortUrlError::InvalidInput(issues) => ApiError::new("input url is invalid")
                 .kind(ApiErrorKind::ValidationError)
                 .detail(serde_json::json!({"invalid_input_url": issues})),
             ShortUrlError::Storage(_e) => {

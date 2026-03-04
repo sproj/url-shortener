@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, State, rejection::JsonRejection},
 };
 use hyper::StatusCode;
 
@@ -39,8 +39,15 @@ pub async fn get_one_by_id(
 
 pub async fn add_one(
     State(state): State<SharedState>,
-    Json(req_payload): Json<CreateShortUrlRequest>,
+    req_payload: Result<Json<CreateShortUrlRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateShortUrlResponse>), ApiError> {
+    // if payload argument is `Json(payload): Json<CreateShortUrl>`
+    // then if the payload is mal-formed or cannot map to target axum replies with a 400 instead of a 422.
+    // Also the returned error is not an ApiError, so no details or error code as the user can expect of other error paths.
+    // So do the parsing step manually and map the parsing error to the same error structure as the rest of the api.
+    let Json(req_payload) =
+        req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
+
     println!("shorturl_handler::add_one called with {:?}", req_payload);
     let dto: NewShortUrlDto = req_payload.try_into()?;
 

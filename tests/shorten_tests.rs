@@ -64,6 +64,60 @@ async fn get_after_create_shorturl_succeeds() {
 }
 
 #[tokio::test]
+async fn mal_formed_json_payload_returns_expected_error() {
+    let sut = test_app::spawn().await;
+    test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
+
+    let url = sut.build_path(API_PATH_SHORTEN);
+
+    let actual = client
+        .post(url)
+        .header("content-type", "application/json")
+        .body(r#"{"long_url":"https://example.com","expires_at": }"#)
+        .send()
+        .await
+        .unwrap();
+    let status = actual.status();
+    let err = actual.json::<ApiError>().await.unwrap();
+    dbg!("{:?}", &err);
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(err.kind, ApiErrorKind::UnprocessableInput);
+    assert_eq!(
+        pick_error_fields(&err, "invalid_input_url", "code"),
+        vec!["parse_create_short_url_input_fail"]
+    );
+}
+
+#[tokio::test]
+async fn well_formed_json_but_invalid_create_request_returns_expected_error() {
+    let sut = test_app::spawn().await;
+    test_app::migrate_test_db(&sut.state).await;
+    let client = reqwest::Client::new();
+
+    let url = sut.build_path(API_PATH_SHORTEN);
+
+    let actual = client
+        .post(url)
+        .header("content-type", "application/json")
+        .body(r#"{"long_url":123,"expires_at":null}"#)
+        .send()
+        .await
+        .unwrap();
+    let status = actual.status();
+    let err = actual.json::<ApiError>().await.unwrap();
+    dbg!("{:?}", &err);
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(err.kind, ApiErrorKind::UnprocessableInput);
+    assert_eq!(
+        pick_error_fields(&err, "invalid_input_url", "code"),
+        vec!["parse_create_short_url_input_fail"]
+    );
+}
+
+#[tokio::test]
 async fn empty_long_url_returns_correct_error() {
     let sut = test_app::spawn().await;
     test_app::migrate_test_db(&sut.state).await;
@@ -81,7 +135,10 @@ async fn empty_long_url_returns_correct_error() {
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(err.kind, ApiErrorKind::ValidationError);
-    assert!(err.detail.is_some_and(|s| s.to_string().contains("empty")));
+    assert_eq!(
+        pick_error_fields(&err, "invalid_input_url", "code"),
+        vec!["empty"]
+    );
 }
 
 #[tokio::test]
@@ -91,7 +148,9 @@ async fn excessively_long_url_returns_correct_error() {
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
-    let long_input = "abc".repeat(1000);
+    let mut long_input = "https://abc".repeat(1000);
+    long_input.push_str(".com");
+
     let input = serde_json::json!({
         "long_url": long_input
     });
@@ -99,13 +158,13 @@ async fn excessively_long_url_returns_correct_error() {
     let actual = client.post(url).json(&input).send().await.unwrap();
     let status = actual.status();
     let err: ApiError = actual.json().await.unwrap();
+    dbg!("{:?}", &err);
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(err.kind, ApiErrorKind::ValidationError);
-    assert!(err.detail.is_some());
-    assert!(
-        err.detail
-            .is_some_and(|s| s.to_string().contains("too many characters"))
+    assert_eq!(
+        pick_error_fields(&err, "invalid_input_url", "code"),
+        vec!["too_long"]
     );
 }
 
@@ -183,7 +242,10 @@ async fn input_url_must_have_host() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(err.kind, ApiErrorKind::ValidationError);
 
-    assert!(err.detail.unwrap().to_string().contains("host"));
+    assert_eq!(
+        pick_error_fields(&err, "invalid_input_url", "code"),
+        vec!["parse_url"]
+    );
 }
 
 #[tokio::test]

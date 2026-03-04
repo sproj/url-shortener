@@ -13,6 +13,7 @@ use crate::application::repository::database_error::DatabaseError;
 #[serde(rename_all = "snake_case")]
 pub enum ApiErrorKind {
     ResourceNotFound,
+    UnprocessableInput,
     ValidationError,
     Internal,
 }
@@ -25,8 +26,9 @@ impl Display for ApiErrorKind {
             // serde_json::json!(self).as_str().unwrap_or_default()
             match self {
                 ApiErrorKind::ResourceNotFound => "resource not found",
-                ApiErrorKind::Internal => "unexpected internal error",
+                ApiErrorKind::UnprocessableInput => "unprocessable input",
                 ApiErrorKind::ValidationError => "invalid request or parameters",
+                ApiErrorKind::Internal => "unexpected internal error",
             }
         )
     }
@@ -44,6 +46,7 @@ impl ApiErrorKind {
             ApiErrorKind::ResourceNotFound => StatusCode::NOT_FOUND,
             ApiErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
             ApiErrorKind::ValidationError => StatusCode::BAD_REQUEST,
+            ApiErrorKind::UnprocessableInput => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 }
