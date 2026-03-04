@@ -35,7 +35,7 @@ impl TryFrom<CreateShortUrlRequest> for NewShortUrlDto {
             return Err(ShortUrlError::InvalidInput(issues));
         }
 
-        let url = url::Url::try_from(input).map_err(|e| {
+        let url = url::Url::parse(input).map_err(|e| {
             ShortUrlError::InvalidInput(vec![ValidationIssue {
                 field: "long_url",
                 code: "parse_url",
