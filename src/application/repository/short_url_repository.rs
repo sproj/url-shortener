@@ -1,10 +1,11 @@
+use crate::{
+    application::{
+        repository::RepositoryResult, service::short_url::ShortUrlSpec, state::SharedState,
+    },
+    domain::models::short_url::ShortUrl,
+};
 use deadpool_postgres::GenericClient;
 use tokio_postgres::types::{ToSql, Type};
-
-use crate::{
-    application::{repository::RepositoryResult, state::SharedState},
-    domain::models::short_url::{NewShortUrlDto, ShortUrl},
-};
 
 pub async fn get_all(state: SharedState) -> RepositoryResult<Vec<ShortUrl>> {
     let client = state.db_pool.get().await?;
@@ -22,32 +23,36 @@ pub async fn get_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<S
         .db_pool
         .get()
         .await?
-        .query_opt("SELECT id, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE id = $1", &[&id])
+        .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE id = $1", &[&id])
         .await?
         .map(ShortUrl::try_from)
         .transpose()
 }
 
-pub async fn add_one(state: SharedState, dto: NewShortUrlDto) -> RepositoryResult<ShortUrl> {
-    println!("short url_repository::add_one called with {:?}", dto);
+pub async fn add_one(state: &SharedState, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
+    println!("short url_repository::add_one called with {:?}", spec);
 
     let client = state.db_pool.get().await?;
 
-    let statement = client
+    let insert_long_url = client
         .prepare_typed(
-            "INSERT INTO short_url (code, long_url, expires_at) \
-        VALUES ($1, $2, $3) \
-        RETURNING id, code, long_url, expires_at, created_at, updated_at, deleted_at",
-            &[Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ],
+            "INSERT INTO short_url (uuid, code, long_url, expires_at) \
+        VALUES ($1, $2, $3, $4) \
+        RETURNING id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at",
+            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ],
         )
         .await?;
 
-    let code = bs58::encode(&dto.long_url).into_string();
-    let params: &[&(dyn ToSql + Sync); 3] = &[&code, &dto.long_url, &dto.expires_at];
+    let params: &[&(dyn ToSql + Sync); 4] = &[
+        &spec.uuid.expect("uuid missing"),
+        &spec.code.expect("code missing"),
+        &spec.long_url,
+        &spec.expires_at,
+    ];
 
-    let row = client.query_one(&statement, params).await?;
+    let inserted_long_url_row = client.query_one(&insert_long_url, params).await?;
 
-    row.try_into()
+    inserted_long_url_row.try_into()
 }
 
 pub async fn delete_one_by_id(state: SharedState, id: i64) -> RepositoryResult<Option<bool>> {

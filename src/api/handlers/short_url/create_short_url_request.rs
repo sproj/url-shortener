@@ -2,11 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::{
-    api::handlers::short_url::ShortUrlError,
-    domain::{
-        models::short_url::NewShortUrlDto,
-        validation_issue::{ValidationIssue, ValidationRule},
-    },
+    api::handlers::short_url::{ShortUrlError, ValidatedCreateShortUrlRequest},
+    domain::validation_issue::{ValidationIssue, ValidationRule},
 };
 
 #[derive(Deserialize, Debug, Clone)]
@@ -15,7 +12,7 @@ pub struct CreateShortUrlRequest {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-impl TryFrom<CreateShortUrlRequest> for NewShortUrlDto {
+impl TryFrom<CreateShortUrlRequest> for ValidatedCreateShortUrlRequest {
     type Error = ShortUrlError;
     fn try_from(value: CreateShortUrlRequest) -> Result<Self, Self::Error> {
         let input: &str = value.long_url.trim();

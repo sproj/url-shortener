@@ -7,6 +7,7 @@ use crate::application::repository::database_error::DatabaseError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortUrl {
     pub id: i64,
+    pub uuid: uuid::Uuid,
     pub code: String,
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
@@ -34,6 +35,9 @@ impl TryFrom<&Row> for ShortUrl {
         Ok(Self {
             id: row
                 .try_get::<_, i64>("id")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            uuid: row
+                .try_get::<_, uuid::Uuid>("uuid")
                 .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
             code: row
                 .try_get("code")

@@ -12,8 +12,10 @@ use crate::{
             create_short_url_response::CreateShortUrlResponse,
         },
     },
-    application::{repository::short_url_repository, state::SharedState},
-    domain::models::short_url::{NewShortUrlDto, ShortUrl},
+    application::{
+        repository::short_url_repository, service::short_url::short_url_service, state::SharedState,
+    },
+    domain::models::short_url::ShortUrl,
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
@@ -45,13 +47,10 @@ pub async fn add_one(
     // then if the payload is mal-formed or cannot map to target axum replies with a 400 instead of a 422.
     // Also the returned error is not an ApiError, so no details or error code as the user can expect of other error paths.
     // So do the parsing step manually and map the parsing error to the same error structure as the rest of the api.
-    let Json(req_payload) =
+    let Json(parsed_input) =
         req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
 
-    println!("shorturl_handler::add_one called with {:?}", req_payload);
-    let dto: NewShortUrlDto = req_payload.try_into()?;
-
-    let created = short_url_repository::add_one(state, dto).await?;
+    let created = short_url_service::add_one(state, parsed_input).await?;
     println!("shorturl_handler::add_one created: {:?}", created);
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
