@@ -1,6 +1,6 @@
 CREATE TABLE short_url (
     id  BIGSERIAL PRIMARY KEY,
-    code TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
     uuid UUID NOT NULL UNIQUE,
     long_url TEXT NOT NULL,
     expires_at TIMESTAMPTZ NULL,

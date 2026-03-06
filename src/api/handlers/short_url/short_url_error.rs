@@ -16,6 +16,8 @@ pub enum ShortUrlError {
     InvalidInput(Vec<ValidationIssue>),
     #[error("data layer error: {0}")]
     Storage(DatabaseError),
+    #[error("code generation exhausted")]
+    CodeGenerationExhausted,
 }
 
 impl From<DatabaseError> for ShortUrlError {
@@ -51,6 +53,10 @@ impl From<&ShortUrlError> for ApiError {
                 .detail(serde_json::json!({"invalid_input_url": issues})),
             ShortUrlError::Storage(_e) => {
                 ApiError::new("internal database error").kind(ApiErrorKind::Internal)
+            }
+            ShortUrlError::CodeGenerationExhausted => {
+                ApiError::new("failed to generate a code after 5 attempts")
+                    .kind(ApiErrorKind::Internal)
             }
         }
     }
