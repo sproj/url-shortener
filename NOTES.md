@@ -35,6 +35,19 @@ Completed:
    * missing/deleted/expired code status and body.
    * Add integration tests for success + not found + expired/deleted branches.
 
+3. **Coverage quick wins (5 tests)**
+   * `short_url_service`: add test for non-`code` conflict branch (no retry, bubble storage error).
+   * `short_url_service`: add test for retry exhaustion branch (already added, keep as baseline when refactoring).
+   * `short_url_handlers`: add integration test for `GET /shorten` empty list path.
+   * `short_url_handlers`: add integration test for `GET /shorten/{id}` with non-numeric id (path parse failure/error shape).
+   * `app/config/startup`: add focused tests for config-load failure and pool-creation failure mapping to `StartupError`.
+
+## Coverage baseline (llvm-cov)
+
+* Function: `64.66%` (`75/116`)
+* Line: `76.77%` (`499/650`)
+* Region: `72.02%` (`623/865`)
+
 ## Deferred TODO
 
 1. **Config ergonomics for tests**
