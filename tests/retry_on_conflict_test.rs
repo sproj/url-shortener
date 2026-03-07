@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use hyper::StatusCode;
 use url_shortener::{
-    api::handlers::short_url::CreateShortUrlResponse,
+    api::{
+        error::{ApiError, ApiErrorKind},
+        handlers::short_url::CreateShortUrlResponse,
+    },
     application::{service::short_url::code_generator::FixedCodeGenerator, state::AppStateBuilder},
 };
 use uuid::Uuid;
@@ -31,6 +34,39 @@ async fn add_one_retries_on_code_conflict_then_succeeds() {
 
     let created = response.json::<CreateShortUrlResponse>().await.unwrap();
     assert_eq!(created.code, "recovered-code");
+}
+
+#[tokio::test]
+async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
+    let sut = spawn_with_fixed_codes(
+        vec![
+            "always-collides",
+            "always-collides",
+            "always-collides",
+            "always-collides",
+            "always-collides",
+        ],
+        5,
+    )
+    .await;
+
+    test_app::migrate_test_db(&sut.state).await;
+    seed_existing_short_url_with_code(&sut, "always-collides").await;
+
+    let url = sut.build_path(API_PATH_SHORTEN);
+    let client = reqwest::Client::new();
+
+    let input = serde_json::json!({
+        "long_url": "http://retry-exhausted.example",
+        "expires_at": null
+    });
+
+    let response = client.post(url).json(&input).send().await.unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    let err = response.json::<ApiError>().await.unwrap();
+    assert_eq!(err.kind, ApiErrorKind::Internal);
+    assert_eq!(err.message, "failed to generate a code after 5 attempts");
 }
 
 async fn spawn_with_fixed_codes(codes: Vec<&str>, max_retries: u8) -> test_app::TestApp {
