@@ -51,7 +51,8 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::InvalidInput(issues) => ApiError::new("input url is invalid")
                 .kind(ApiErrorKind::ValidationError)
                 .detail(serde_json::json!({"invalid_input_url": issues})),
-            ShortUrlError::Storage(_e) => {
+            ShortUrlError::Storage(e) => {
+                eprintln!("Unexpected database error: {:?}", e);
                 ApiError::new("internal database error").kind(ApiErrorKind::Internal)
             }
             ShortUrlError::CodeGenerationExhausted => {

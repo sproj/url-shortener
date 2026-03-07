@@ -12,15 +12,13 @@ use crate::{
             create_short_url_response::CreateShortUrlResponse,
         },
     },
-    application::{
-        repository::short_url_repository, service::short_url::short_url_service, state::SharedState,
-    },
+    application::state::SharedState,
     domain::models::short_url::ShortUrl,
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
     println!("shorturl_handler::get_all called");
-    let short_urls = short_url_repository::get_all(state).await?;
+    let short_urls = state.short_url.get_all().await?;
     println!("shorturl_handler::get_all returning");
     Ok(Json(short_urls))
 }
@@ -30,7 +28,7 @@ pub async fn get_one_by_id(
     Path(id): Path<i64>,
 ) -> Result<Json<ShortUrl>, ApiError> {
     println!("shorturl_handler::get_one_by_id called with {}", id);
-    if let Some(short) = short_url_repository::get_by_id(state, id).await? {
+    if let Some(short) = state.short_url.get_by_id(id).await? {
         println!("shorturl_handler::get_one_by_id returning Ok");
         Ok(Json(short))
     } else {
@@ -50,7 +48,7 @@ pub async fn add_one(
     let Json(parsed_input) =
         req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
 
-    let created = short_url_service::add_one(state, parsed_input).await?;
+    let created = state.short_url.add_one(parsed_input).await?;
     println!("shorturl_handler::add_one created: {:?}", created);
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
@@ -64,7 +62,7 @@ pub async fn delete_one_by_id(
     Path(id): Path<i64>,
 ) -> Result<Json<bool>, ApiError> {
     println!("shorturl_handler::delete_one called with {}", id);
-    if let Some(deleted_count) = short_url_repository::delete_one_by_id(state, id).await? {
+    if let Some(deleted_count) = state.short_url.delete_one_by_id(id).await? {
         println!("shorturl_handler::delete_one returning Ok");
         Ok(Json(deleted_count))
     } else {
