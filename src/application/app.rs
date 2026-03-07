@@ -2,10 +2,8 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 
 use crate::application::config;
-use crate::application::repository::short_url_repository::ShortUrlRepository;
-use crate::application::service::short_url::short_url_service::ShortUrlService;
 use crate::application::startup_error::StartupError;
-use crate::application::state::{AppState, SharedState};
+use crate::application::state::{AppStateBuilder, SharedState};
 use crate::{api::server, application::config::Config};
 
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
@@ -17,18 +15,19 @@ pub async fn load() -> Result<Config, StartupError> {
 }
 
 pub async fn build(config: &Config) -> Result<SharedState, StartupError> {
+    build_with_state_builder(config, AppStateBuilder::default()).await
+}
+
+pub async fn build_with_state_builder(
+    config: &Config,
+    state_builder: AppStateBuilder,
+) -> Result<SharedState, StartupError> {
     println!("Creating AppState");
 
     let pool = create_db_pool(config)?;
 
-    println!("Creating domain services");
-    let short_url_repository = ShortUrlRepository::new(pool.clone());
-    let short_url_service = Arc::new(ShortUrlService::new(short_url_repository));
-
-    Ok(Arc::new(AppState {
-        db_pool: pool,
-        short_url: short_url_service,
-    }))
+    println!("Setting AppState");
+    Ok(Arc::new(state_builder.build(pool)))
 }
 
 fn create_db_pool(config: &Config) -> Result<Pool, StartupError> {

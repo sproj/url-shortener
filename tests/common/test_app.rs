@@ -6,7 +6,11 @@ use tokio::time::Instant;
 use url_shortener::{
     api::server,
     application::{
-        self, app::build, config::Config, startup_error::StartupError, state::SharedState,
+        self,
+        app::build_with_state_builder,
+        config::Config,
+        startup_error::StartupError,
+        state::{AppStateBuilder, SharedState},
     },
 };
 
@@ -50,9 +54,17 @@ pub async fn load_config() -> Result<Config, StartupError> {
 }
 
 pub async fn spawn_with_config(config: Config, db: Arc<SharedTestDb>) -> TestApp {
+    spawn_with_config_and_builder(config, db, AppStateBuilder::default()).await
+}
+
+pub async fn spawn_with_config_and_builder(
+    config: Config,
+    db: Arc<SharedTestDb>,
+    state_builder: AppStateBuilder,
+) -> TestApp {
     let cfg = config.clone();
 
-    let state = build(&cfg).await.unwrap();
+    let state = build_with_state_builder(&cfg, state_builder).await.unwrap();
 
     let listener = server::listen(config).await.unwrap();
     let addr = listener.local_addr().unwrap();

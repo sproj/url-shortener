@@ -14,6 +14,8 @@ use crate::{
     domain::models::short_url::ShortUrl,
 };
 
+const SHORT_URL_CODE_KEY_CONSTRAINT_NAME: &str = "short_url_code_key";
+
 pub struct ShortUrlService {
     code_generator: Arc<dyn CodeGenerator>,
     max_retries: u8,
@@ -25,6 +27,18 @@ impl ShortUrlService {
             repository: Arc::new(repository),
             code_generator: Arc::new(RandomCodeGenerator),
             max_retries: 5,
+        }
+    }
+
+    pub fn new_with_generator(
+        repository: ShortUrlRepository,
+        code_generator: Arc<dyn CodeGenerator>,
+        max_retries: u8,
+    ) -> Self {
+        ShortUrlService {
+            code_generator,
+            max_retries,
+            repository: Arc::new(repository),
         }
     }
 
@@ -71,12 +85,22 @@ impl ShortUrlService {
                     message,
                 }) => {
                     println!(
-                        "shorturl_service::add_one conflict on attempt {}: {:?}, {}, {message}",
-                        attempt,
-                        state,
-                        constraint.unwrap_or_default()
+                        "shorturl_service::add_one conflict on attempt {}: {:?}, {}",
+                        attempt, state, &message
                     );
-                    continue;
+                    let is_code_conflict = matches!(
+                        constraint.as_deref(),
+                        Some(SHORT_URL_CODE_KEY_CONSTRAINT_NAME)
+                    );
+                    if is_code_conflict {
+                        continue;
+                    } else {
+                        return Err(ShortUrlError::Storage(DatabaseError::Conflict {
+                            state,
+                            constraint,
+                            message,
+                        }));
+                    }
                 }
                 Err(e) => {
                     eprintln!("database error when inserting short_url: {:?}", e);
