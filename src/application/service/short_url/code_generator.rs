@@ -24,6 +24,15 @@ fn generate_9_bytes_base64url() -> String {
 pub struct FixedCodeGenerator {
     codes: Mutex<VecDeque<String>>,
 }
+
+impl FixedCodeGenerator {
+    pub fn new(codes: Vec<String>) -> Self {
+        Self {
+            codes: Mutex::new(VecDeque::from(codes)),
+        }
+    }
+}
+
 impl CodeGenerator for FixedCodeGenerator {
     fn next_code(&self) -> String {
         self.codes.lock().unwrap().pop_front().unwrap()
