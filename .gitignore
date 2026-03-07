@@ -11,3 +11,6 @@ refinery.toml
 AGENTS.md
 CLAUDE.md
 .claude
+
+# coverage artifacts
+/coverage
