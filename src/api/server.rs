@@ -1,5 +1,5 @@
 use crate::{
-    api::routes::{hello_routes, short_url_routes},
+    api::routes::short_url_routes,
     application::{config::Config, startup_error::StartupError, state::SharedState},
 };
 use axum::{
@@ -29,7 +29,6 @@ pub async fn serve(listener: TcpListener, state: SharedState) {
     let router = Router::new()
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
-        .nest("/hello", hello_routes::routes())
         .nest("/shorten", short_url_routes::routes())
         .fallback(error_404_handler)
         .with_state(state);
