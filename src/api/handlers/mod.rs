@@ -1,2 +1,2 @@
-pub mod hello_world;
+pub mod redirect;
 pub mod short_url;

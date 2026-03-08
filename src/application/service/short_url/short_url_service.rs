@@ -50,6 +50,10 @@ impl ShortUrlService {
         self.repository.get_by_id(id).await
     }
 
+    pub async fn get_by_code(&self, code: String) -> Result<Option<ShortUrl>, DatabaseError> {
+        self.repository.get_by_code(code).await
+    }
+
     pub async fn delete_one_by_id(&self, id: i64) -> Result<Option<bool>, DatabaseError> {
         self.repository.delete_one_by_id(id).await
     }

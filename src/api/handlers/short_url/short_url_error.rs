@@ -9,7 +9,7 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum ShortUrlError {
     #[error("short_url not found: {0}")] // todo: I do not get how this macro works
-    NotFound(i64), // todo: short_url should have a uuid so the database id is not exposed
+    NotFound(String), // todo: short_url should have a uuid so the database id is not exposed
     #[error("invalid input: {0}")]
     UnprocessableInput(String),
     #[error("invalid input url: {0:?}")]
