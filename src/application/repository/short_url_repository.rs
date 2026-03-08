@@ -21,7 +21,7 @@ impl ShortUrlRepository {
     pub async fn get_all(&self) -> RepositoryResult<Vec<ShortUrl>> {
         let client = self.pool.get().await?;
 
-        let rows = client.query("SELECT id, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url", &[]).await?;
+        let rows = client.query("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url", &[]).await?;
 
         rows.into_iter()
             .map(ShortUrl::try_from)

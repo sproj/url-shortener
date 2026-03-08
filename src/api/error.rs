@@ -104,7 +104,7 @@ impl From<DatabaseError> for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        dbg!("Error response: {:?}", &self);
+        dbg!(format!("Error response: {:?}", &self));
         let status_code = self.kind.status_code();
         (status_code, Json(self)).into_response()
     }

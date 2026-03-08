@@ -1,9 +1,12 @@
 use crate::common::{constants::API_PATH_SHORTEN, helpers::pick_error_fields, test_app};
 use chrono::{Duration, Utc};
 use hyper::StatusCode;
-use url_shortener::api::{
-    error::{ApiError, ApiErrorKind},
-    handlers::short_url::CreateShortUrlResponse,
+use url_shortener::{
+    api::{
+        error::{ApiError, ApiErrorKind},
+        handlers::short_url::CreateShortUrlResponse,
+    },
+    domain::models::short_url::ShortUrl,
 };
 
 pub mod common;
@@ -61,6 +64,41 @@ async fn get_after_create_shorturl_succeeds() {
     let actual = read.json::<CreateShortUrlResponse>().await.unwrap();
 
     assert_eq!(actual.long_url, expected)
+}
+
+#[tokio::test]
+async fn get_all_succeeds() {
+    let sut = test_app::spawn().await;
+
+    test_app::migrate_test_db(&sut.state).await;
+
+    let create_url = sut.build_path(API_PATH_SHORTEN);
+
+    let client = reqwest::Client::new();
+
+    let input = serde_json::json!({
+        "long_url": "http://read.me/to",
+        "expires_at": null
+    });
+
+    let create = client
+        .post(create_url.clone())
+        .json(&input)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+
+    let expected_id = create.json::<CreateShortUrlResponse>().await.unwrap().id;
+
+    let read_all = client.get(create_url).send().await.unwrap();
+
+    assert_eq!(read_all.status(), StatusCode::OK);
+
+    let actual = read_all.json::<Vec<ShortUrl>>().await.unwrap();
+
+    assert!(actual.iter().any(|el| el.id == expected_id));
 }
 
 #[tokio::test]
