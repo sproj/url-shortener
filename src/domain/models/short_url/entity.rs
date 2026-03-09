@@ -18,7 +18,11 @@ pub struct ShortUrl {
 
 impl ShortUrl {
     pub fn is_expired(&self) -> bool {
-        self.expires_at.is_some_and(|ts| ts <= Utc::now())
+        self.expires_at.is_some_and(|ts| ts <= Utc::now()) && (!self.is_deleted())
+    }
+
+    pub fn is_deleted(&self) -> bool {
+        self.deleted_at.is_some()
     }
 }
 

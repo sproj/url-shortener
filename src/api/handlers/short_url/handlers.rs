@@ -42,7 +42,7 @@ pub async fn get_one_by_code(
     Path(code): Path<String>,
 ) -> Result<Json<ShortUrl>, ApiError> {
     println!("shorturl_handler::get_one_by_code called with {}", &code);
-    if let Some(short) = state.short_url.get_by_code(code.clone()).await? {
+    if let Some(short) = state.short_url.get_by_code(&code).await? {
         println!("short_url_handler::get_one_by_code returning Ok");
         Ok(Json(short))
     } else {
