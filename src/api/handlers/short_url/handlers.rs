@@ -33,7 +33,21 @@ pub async fn get_one_by_id(
         Ok(Json(short))
     } else {
         eprintln!("shorturl_handler::get_one_by_id returning ShortUrlError");
-        Err(ApiError::from(ShortUrlError::NotFound(id)))
+        Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))
+    }
+}
+
+pub async fn get_one_by_code(
+    State(state): State<SharedState>,
+    Path(code): Path<String>,
+) -> Result<Json<ShortUrl>, ApiError> {
+    println!("shorturl_handler::get_one_by_code called with {}", &code);
+    if let Some(short) = state.short_url.get_by_code(&code).await? {
+        println!("short_url_handler::get_one_by_code returning Ok");
+        Ok(Json(short))
+    } else {
+        eprintln!("short_url_handler::get_one_by_code returning ShortUrlError");
+        Err(ApiError::from(ShortUrlError::NotFound(code)))
     }
 }
 
@@ -67,6 +81,6 @@ pub async fn delete_one_by_id(
         Ok(Json(deleted_count))
     } else {
         eprintln!("shorturl_handler::delete_one returning ShortUrlError");
-        Err(ApiError::from(ShortUrlError::NotFound(id)))
+        Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))
     }
 }

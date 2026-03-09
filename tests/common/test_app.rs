@@ -6,10 +6,8 @@ use tokio::time::Instant;
 use url_shortener::{
     api::server,
     application::{
-        self,
-        app::build_with_state_builder,
+        app::App,
         config::Config,
-        startup_error::StartupError,
         state::{AppStateBuilder, SharedState},
     },
 };
@@ -26,6 +24,10 @@ pub struct TestApp {
 }
 
 impl TestApp {
+    pub fn builder() -> TestAppBuilder {
+        TestAppBuilder::default()
+    }
+
     pub fn build_path(&self, path: &str) -> reqwest::Url {
         let url = format!("http://{}/{}", self.socket_address, path);
         dbg!("building url: {}", &url);
@@ -33,59 +35,101 @@ impl TestApp {
     }
 }
 
-pub async fn spawn() -> TestApp {
-    let db = test_db::get_or_create().await;
-
-    let mut config = load_config().await.unwrap();
-    config.db.postgres_host = db.host.clone();
-    config.db.postgres_port = db.port;
-    config.db.postgres_db = db.db_name.clone();
-    config.db.postgres_user = db.user.clone();
-    config.db.postgres_password = db.password.clone();
-
-    // hoom hum: .env.test should include this but force the issue so you don't make mistakes such as `ENT_TEST=1 cargo test`.
-    config.service_port = 0;
-
-    spawn_with_config(config, db).await
-}
-
-pub async fn load_config() -> Result<Config, StartupError> {
-    url_shortener::application::config::load()
-}
-
-pub async fn spawn_with_config(config: Config, db: Arc<SharedTestDb>) -> TestApp {
-    spawn_with_config_and_builder(config, db, AppStateBuilder::default()).await
-}
-
-pub async fn spawn_with_config_and_builder(
-    config: Config,
-    db: Arc<SharedTestDb>,
+pub struct TestAppBuilder {
+    config: Option<Config>,
+    db: Option<Arc<SharedTestDb>>,
     state_builder: AppStateBuilder,
-) -> TestApp {
-    let cfg = config.clone();
-
-    let state = build_with_state_builder(&cfg, state_builder).await.unwrap();
-
-    let listener = server::listen(config).await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    dbg!(format!("test_app will listen on port: {}", &addr));
-
-    tokio::spawn(server::serve(listener, state.clone()));
-
-    let sut = TestApp {
-        socket_address: addr,
-        _db: db,
-        state,
-    };
-
-    let healthz = sut.build_path(constants::API_PATH_HEALTH);
-    wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
-
-    sut
+    auto_migrate: bool,
 }
 
-pub async fn migrate_test_db(state: &Arc<application::state::AppState>) {
-    application::app::migrate(state).await.unwrap();
+impl TestAppBuilder {
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn with_db(mut self, db: Arc<SharedTestDb>) -> Self {
+        self.db = Some(db);
+        self
+    }
+
+    pub fn with_state_builder(mut self, state_builder: AppStateBuilder) -> Self {
+        self.state_builder = state_builder;
+        self
+    }
+
+    pub fn with_auto_migrate(mut self, auto_migrate: bool) -> Self {
+        self.auto_migrate = auto_migrate;
+        self
+    }
+
+    pub async fn build(self) -> TestApp {
+        let db = match self.db {
+            Some(db) => db,
+            None => test_db::get_or_create().await,
+        };
+
+        let config = match self.config {
+            Some(config) => config,
+            None => Self::default_test_config_for_db(db.as_ref()).await,
+        };
+
+        let app = App::builder()
+            .with_config(config.clone())
+            .with_state_builder(self.state_builder)
+            .with_auto_migrate(false)
+            .build()
+            .await
+            .unwrap();
+
+        let app = if self.auto_migrate {
+            app.migrate().await.unwrap()
+        } else {
+            app
+        };
+
+        let state = app.state().clone();
+
+        let listener = server::listen(config).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        dbg!(format!("test_app will listen on port: {}", &addr));
+
+        tokio::spawn(server::serve(listener, state.clone()));
+
+        let sut = TestApp {
+            socket_address: addr,
+            _db: db,
+            state,
+        };
+
+        let healthz = sut.build_path(constants::API_PATH_HEALTH);
+        wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
+
+        sut
+    }
+    async fn default_test_config_for_db(db: &SharedTestDb) -> Config {
+        let mut config = url_shortener::application::config::load().unwrap();
+        config.db.postgres_host = db.host.clone();
+        config.db.postgres_port = db.port;
+        config.db.postgres_db = db.db_name.clone();
+        config.db.postgres_user = db.user.clone();
+        config.db.postgres_password = db.password.clone();
+
+        // .env.test should include this, but force the issue to avoid accidental fixed-port tests.
+        config.service_port = 0;
+        config
+    }
+}
+
+impl Default for TestAppBuilder {
+    fn default() -> Self {
+        Self {
+            config: None,
+            db: None,
+            state_builder: AppStateBuilder::default(),
+            auto_migrate: false,
+        }
+    }
 }
 
 async fn wait_for_service(duration: Duration, url: &str) {

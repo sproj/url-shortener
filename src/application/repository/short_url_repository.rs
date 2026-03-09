@@ -39,6 +39,15 @@ impl ShortUrlRepository {
         .transpose()
     }
 
+    pub async fn get_by_code(&self, code: &str) -> RepositoryResult<Option<ShortUrl>> {
+        println!("ShortUrlRepository::get_by_code called with {}", &code);
+        self.pool.get().await?
+        .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE code = $1", &[&code])
+        .await?
+        .map(ShortUrl::try_from)
+        .transpose()
+    }
+
     pub async fn add_one(&self, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
         println!("short url_repository::add_one called with {:?}", spec);
 

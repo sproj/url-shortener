@@ -9,7 +9,7 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum ShortUrlError {
     #[error("short_url not found: {0}")] // todo: I do not get how this macro works
-    NotFound(i64), // todo: short_url should have a uuid so the database id is not exposed
+    NotFound(String), // todo: short_url should have a uuid so the database id is not exposed
     #[error("invalid input: {0}")]
     UnprocessableInput(String),
     #[error("invalid input url: {0:?}")]
@@ -37,9 +37,9 @@ impl From<&ShortUrlError> for ApiError {
         let short_url_error_message = &short_url_error.to_string();
         eprintln!("ShortUrlError: {:?}", &short_url_error);
         match short_url_error {
-            ShortUrlError::NotFound(id) => ApiError::new(short_url_error_message)
+            ShortUrlError::NotFound(id_or_code) => ApiError::new(short_url_error_message)
                 .kind(ApiErrorKind::ResourceNotFound)
-                .detail(serde_json::json!({ "short_url_id": id })),
+                .detail(serde_json::json!({ "not_found": id_or_code })),
             ShortUrlError::UnprocessableInput(msg) => ApiError::new("unprocessable_input")
                 .kind(ApiErrorKind::UnprocessableInput)
                 .detail(serde_json::json!({"invalid_input_url": [{

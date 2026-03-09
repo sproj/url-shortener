@@ -21,6 +21,14 @@ pub struct ShortUrlService {
     max_retries: u8,
     repository: Arc<ShortUrlRepository>,
 }
+
+pub enum RedirectDecision {
+    Permanent { long_url: String },
+    Temporary { long_url: String },
+    Gone,
+    NotFound,
+}
+
 impl ShortUrlService {
     pub fn new(repository: ShortUrlRepository) -> Self {
         Self {
@@ -48,6 +56,10 @@ impl ShortUrlService {
 
     pub async fn get_by_id(&self, id: i64) -> Result<Option<ShortUrl>, DatabaseError> {
         self.repository.get_by_id(id).await
+    }
+
+    pub async fn get_by_code(&self, code: &str) -> Result<Option<ShortUrl>, DatabaseError> {
+        self.repository.get_by_code(code).await
     }
 
     pub async fn delete_one_by_id(&self, id: i64) -> Result<Option<bool>, DatabaseError> {
@@ -109,5 +121,23 @@ impl ShortUrlService {
             }
         }
         Err(ShortUrlError::CodeGenerationExhausted)
+    }
+
+    pub async fn resolve_redirect_decision(
+        &self,
+        code: &str,
+    ) -> Result<RedirectDecision, DatabaseError> {
+        let record = self.get_by_code(code).await?;
+        match record {
+            None => Ok(RedirectDecision::NotFound),
+            Some(short) if short.is_deleted() => Ok(RedirectDecision::Gone),
+            Some(short) if short.is_expired() => Ok(RedirectDecision::Gone),
+            Some(short) if short.expires_at.is_none() => Ok(RedirectDecision::Permanent {
+                long_url: short.long_url,
+            }),
+            Some(short) => Ok(RedirectDecision::Temporary {
+                long_url: short.long_url,
+            }),
+        }
     }
 }
