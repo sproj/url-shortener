@@ -42,6 +42,15 @@ Completed:
    * `short_url_handlers`: add integration test for `GET /shorten/{id}` with non-numeric id (path parse failure/error shape).
    * `app/config/startup`: add focused tests for config-load failure and pool-creation failure mapping to `StartupError`.
 
+4. **API identifier cleanup (after redirect pass)**
+   * Current temporary state: `get by code` is exposed in RPC style for momentum while redirect feature is in progress.
+   * Remove database `id` from API request/response shapes.
+   * Make `uuid` the canonical external resource identifier.
+   * Remove `/shorten/{id}` and migrate handlers/tests to uuid-based lookups.
+   * Revisit endpoint shape toward REST conventions:
+   * canonical path lookup by uuid,
+   * optional query/filter lookups by `code`/`uuid` where appropriate.
+
 ## Coverage baseline (llvm-cov)
 
 * Function: `64.66%` (`75/116`)
