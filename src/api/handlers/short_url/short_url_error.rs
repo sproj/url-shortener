@@ -37,9 +37,9 @@ impl From<&ShortUrlError> for ApiError {
         let short_url_error_message = &short_url_error.to_string();
         eprintln!("ShortUrlError: {:?}", &short_url_error);
         match short_url_error {
-            ShortUrlError::NotFound(id) => ApiError::new(short_url_error_message)
+            ShortUrlError::NotFound(id_or_code) => ApiError::new(short_url_error_message)
                 .kind(ApiErrorKind::ResourceNotFound)
-                .detail(serde_json::json!({ "short_url_id": id })),
+                .detail(serde_json::json!({ "not_found": id_or_code })),
             ShortUrlError::UnprocessableInput(msg) => ApiError::new("unprocessable_input")
                 .kind(ApiErrorKind::UnprocessableInput)
                 .detail(serde_json::json!({"invalid_input_url": [{

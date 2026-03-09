@@ -9,6 +9,116 @@ use crate::{api::server, application::config::Config};
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
 use tokio_postgres::NoTls;
 
+pub struct App {
+    config: Config,
+    state: SharedState,
+    auto_migrate: bool,
+}
+
+impl App {
+    pub fn builder() -> AppBuilder {
+        AppBuilder::default()
+    }
+
+    pub async fn run() -> Result<(), StartupError> {
+        Self::builder().build().await?.start().await
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn state(&self) -> &SharedState {
+        &self.state
+    }
+
+    pub async fn migrate(self) -> Result<Self, StartupError> {
+        let report = crate::application::app::migrate(&self.state).await?;
+        println!("{:?}", report.applied_migrations());
+        Ok(self)
+    }
+
+    pub async fn start(self) -> Result<(), StartupError> {
+        if self.auto_migrate {
+            let report = crate::application::app::migrate(&self.state).await?;
+            println!("{:?}", report.applied_migrations());
+        }
+
+        crate::application::app::run(self.config, self.state).await
+    }
+}
+
+pub struct AppBuilder {
+    config: Option<Config>,
+    db_pool: Option<Pool>,
+    state: Option<SharedState>,
+    state_builder: AppStateBuilder,
+    auto_migrate: bool,
+}
+
+impl AppBuilder {
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn with_db_pool(mut self, db_pool: Pool) -> Self {
+        self.db_pool = Some(db_pool);
+        self
+    }
+
+    pub fn with_state(mut self, state: SharedState) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    pub fn with_state_builder(mut self, state_builder: AppStateBuilder) -> Self {
+        self.state_builder = state_builder;
+        self
+    }
+
+    pub fn with_auto_migrate(mut self, auto_migrate: bool) -> Self {
+        self.auto_migrate = auto_migrate;
+        self
+    }
+
+    pub async fn build(self) -> Result<App, StartupError> {
+        let config = match self.config {
+            Some(config) => config,
+            None => load().await?,
+        };
+
+        let state = match self.state {
+            Some(state) => state,
+            None => {
+                let db_pool = match self.db_pool {
+                    Some(pool) => pool,
+                    None => create_db_pool(&config)?,
+                };
+                Arc::new(self.state_builder.build(db_pool))
+            }
+        };
+
+        Ok(App {
+            config,
+            state,
+            auto_migrate: self.auto_migrate,
+        })
+    }
+}
+
+impl Default for AppBuilder {
+    fn default() -> Self {
+        Self {
+            config: None,
+            db_pool: None,
+            state: None,
+            state_builder: AppStateBuilder::default(),
+            auto_migrate: true,
+        }
+    }
+}
+
 pub async fn load() -> Result<Config, StartupError> {
     println!("Loading config");
     config::load()

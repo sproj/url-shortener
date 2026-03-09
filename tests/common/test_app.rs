@@ -26,6 +26,10 @@ pub struct TestApp {
 }
 
 impl TestApp {
+    pub fn builder() -> TestAppBuilder {
+        TestAppBuilder::default()
+    }
+
     pub fn build_path(&self, path: &str) -> reqwest::Url {
         let url = format!("http://{}/{}", self.socket_address, path);
         dbg!("building url: {}", &url);
@@ -33,20 +37,68 @@ impl TestApp {
     }
 }
 
+pub struct TestAppBuilder {
+    config: Option<Config>,
+    db: Option<Arc<SharedTestDb>>,
+    state_builder: AppStateBuilder,
+    auto_migrate: bool,
+}
+
+impl TestAppBuilder {
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn with_db(mut self, db: Arc<SharedTestDb>) -> Self {
+        self.db = Some(db);
+        self
+    }
+
+    pub fn with_state_builder(mut self, state_builder: AppStateBuilder) -> Self {
+        self.state_builder = state_builder;
+        self
+    }
+
+    pub fn with_auto_migrate(mut self, auto_migrate: bool) -> Self {
+        self.auto_migrate = auto_migrate;
+        self
+    }
+
+    pub async fn build(self) -> TestApp {
+        let db = match self.db {
+            Some(db) => db,
+            None => test_db::get_or_create().await,
+        };
+
+        let config = match self.config {
+            Some(config) => config,
+            None => default_test_config_for_db(db.as_ref()).await,
+        };
+
+        spawn_with_config_and_builder_and_migrate(
+            config,
+            db,
+            self.state_builder,
+            self.auto_migrate,
+        )
+        .await
+    }
+}
+
+impl Default for TestAppBuilder {
+    fn default() -> Self {
+        Self {
+            config: None,
+            db: None,
+            state_builder: AppStateBuilder::default(),
+            auto_migrate: false,
+        }
+    }
+}
+
 pub async fn spawn() -> TestApp {
-    let db = test_db::get_or_create().await;
-
-    let mut config = load_config().await.unwrap();
-    config.db.postgres_host = db.host.clone();
-    config.db.postgres_port = db.port;
-    config.db.postgres_db = db.db_name.clone();
-    config.db.postgres_user = db.user.clone();
-    config.db.postgres_password = db.password.clone();
-
-    // hoom hum: .env.test should include this but force the issue so you don't make mistakes such as `ENT_TEST=1 cargo test`.
-    config.service_port = 0;
-
-    spawn_with_config(config, db).await
+    TestApp::builder().build().await
 }
 
 pub async fn load_config() -> Result<Config, StartupError> {
@@ -54,7 +106,7 @@ pub async fn load_config() -> Result<Config, StartupError> {
 }
 
 pub async fn spawn_with_config(config: Config, db: Arc<SharedTestDb>) -> TestApp {
-    spawn_with_config_and_builder(config, db, AppStateBuilder::default()).await
+    spawn_with_config_and_builder_and_migrate(config, db, AppStateBuilder::default(), false).await
 }
 
 pub async fn spawn_with_config_and_builder(
@@ -62,9 +114,22 @@ pub async fn spawn_with_config_and_builder(
     db: Arc<SharedTestDb>,
     state_builder: AppStateBuilder,
 ) -> TestApp {
+    spawn_with_config_and_builder_and_migrate(config, db, state_builder, false).await
+}
+
+pub async fn spawn_with_config_and_builder_and_migrate(
+    config: Config,
+    db: Arc<SharedTestDb>,
+    state_builder: AppStateBuilder,
+    auto_migrate: bool,
+) -> TestApp {
     let cfg = config.clone();
 
     let state = build_with_state_builder(&cfg, state_builder).await.unwrap();
+
+    if auto_migrate {
+        application::app::migrate(&state).await.unwrap();
+    }
 
     let listener = server::listen(config).await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -82,6 +147,19 @@ pub async fn spawn_with_config_and_builder(
     wait_for_service(Duration::from_secs(5), healthz.as_str()).await;
 
     sut
+}
+
+async fn default_test_config_for_db(db: &SharedTestDb) -> Config {
+    let mut config = load_config().await.unwrap();
+    config.db.postgres_host = db.host.clone();
+    config.db.postgres_port = db.port;
+    config.db.postgres_db = db.db_name.clone();
+    config.db.postgres_user = db.user.clone();
+    config.db.postgres_password = db.password.clone();
+
+    // .env.test should include this, but force the issue to avoid accidental fixed-port tests.
+    config.service_port = 0;
+    config
 }
 
 pub async fn migrate_test_db(state: &Arc<application::state::AppState>) {
