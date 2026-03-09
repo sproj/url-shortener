@@ -10,15 +10,25 @@ use url_shortener::{
 };
 use uuid::Uuid;
 
-use crate::common::{constants::API_PATH_SHORTEN, test_app, test_db};
+use crate::common::{constants::API_PATH_SHORTEN, test_app};
 
 pub mod common;
 
 #[tokio::test]
 async fn add_one_retries_on_code_conflict_then_succeeds() {
-    let sut = spawn_with_fixed_codes(vec!["conflict-code", "recovered-code"], 5).await;
+    let state_builder = AppStateBuilder::default()
+        .with_code_generator(Arc::new(FixedCodeGenerator::new(vec![
+            "conflict-code".to_string(),
+            "recovered-code".to_string(),
+        ])))
+        .with_max_retries(5);
 
-    test_app::migrate_test_db(&sut.state).await;
+    let sut = test_app::TestApp::builder()
+        .with_state_builder(state_builder)
+        .with_auto_migrate(true)
+        .build()
+        .await;
+
     seed_existing_short_url_with_code(&sut, "conflict-code").await;
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -38,19 +48,27 @@ async fn add_one_retries_on_code_conflict_then_succeeds() {
 
 #[tokio::test]
 async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
-    let sut = spawn_with_fixed_codes(
-        vec![
-            "always-collides",
-            "always-collides",
-            "always-collides",
-            "always-collides",
-            "always-collides",
-        ],
-        5,
-    )
-    .await;
+    let state_builder = AppStateBuilder::default()
+        .with_code_generator(Arc::new(FixedCodeGenerator::new(
+            vec![
+                "always-collides",
+                "always-collides",
+                "always-collides",
+                "always-collides",
+                "always-collides",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        )))
+        .with_max_retries(5);
 
-    test_app::migrate_test_db(&sut.state).await;
+    let sut = test_app::TestApp::builder()
+        .with_state_builder(state_builder)
+        .with_auto_migrate(true)
+        .build()
+        .await;
+
     seed_existing_short_url_with_code(&sut, "always-collides").await;
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -67,26 +85,6 @@ async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
     let err = response.json::<ApiError>().await.unwrap();
     assert_eq!(err.kind, ApiErrorKind::Internal);
     assert_eq!(err.message, "failed to generate a code after 5 attempts");
-}
-
-async fn spawn_with_fixed_codes(codes: Vec<&str>, max_retries: u8) -> test_app::TestApp {
-    let db = test_db::get_or_create().await;
-
-    let mut config = test_app::load_config().await.unwrap();
-    config.db.postgres_host = db.host.clone();
-    config.db.postgres_port = db.port;
-    config.db.postgres_db = db.db_name.clone();
-    config.db.postgres_user = db.user.clone();
-    config.db.postgres_password = db.password.clone();
-    config.service_port = 0;
-
-    let state_builder = AppStateBuilder::default()
-        .with_code_generator(Arc::new(FixedCodeGenerator::new(
-            codes.into_iter().map(str::to_owned).collect(),
-        )))
-        .with_max_retries(max_retries);
-
-    test_app::spawn_with_config_and_builder(config, db, state_builder).await
 }
 
 async fn seed_existing_short_url_with_code(sut: &test_app::TestApp, code: &str) {
