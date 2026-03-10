@@ -28,9 +28,10 @@ impl Config {
         format!("{}://{}:{}", "http", self.service_host, self.service_port)
     }
 
-    pub fn service_socket_address(&self) -> SocketAddr {
+    pub fn service_socket_address(&self) -> Result<SocketAddr, StartupError> {
         use std::str::FromStr;
-        SocketAddr::from_str(&format!("{}:{}", self.service_host, self.service_port)).unwrap()
+        SocketAddr::from_str(&format!("{}:{}", self.service_host, self.service_port))
+            .map_err(|e| StartupError::Server(e.to_string()))
     }
 }
 
@@ -50,26 +51,28 @@ pub fn load() -> Result<Config, StartupError> {
         return Err(StartupError::Config(config_not_found));
     }
 
-    Ok(Config {
-        service_host: env_get("SERVICE_HOST"),
-        service_port: env_parse("SERVICE_PORT"),
+    let cfg = Config {
+        service_host: env_get("SERVICE_HOST")?,
+        service_port: env_parse("SERVICE_PORT")?,
         db: DbConfig {
-            postgres_user: env_get("POSTGRES_USER"),
-            postgres_password: env_get("POSTGRES_PASSWORD"),
-            postgres_host: env_get("POSTGRES_HOST"),
-            postgres_port: env_parse("POSTGRES_PORT"),
-            postgres_db: env_get("POSTGRES_DB"),
-            postgres_connection_pool: env_parse("POSTGRES_CONNECTION_POOL"),
+            postgres_user: env_get("POSTGRES_USER")?,
+            postgres_password: env_get("POSTGRES_PASSWORD")?,
+            postgres_host: env_get("POSTGRES_HOST")?,
+            postgres_port: env_parse("POSTGRES_PORT")?,
+            postgres_db: env_get("POSTGRES_DB")?,
+            postgres_connection_pool: env_parse("POSTGRES_CONNECTION_POOL")?,
         },
-    })
+    };
+
+    Ok(cfg)
 }
 
-fn env_get(key: &str) -> String {
+fn env_get(key: &str) -> Result<String, StartupError> {
     match std::env::var(key) {
-        Ok(v) => v,
+        Ok(v) => Ok(v),
         Err(e) => {
             let msg = format!("{} {}", key, e);
-            panic!("{msg}")
+            Err(StartupError::Config(msg))
         }
     }
 }
@@ -81,9 +84,12 @@ fn env_get_or(key: &str, default: &str) -> String {
     default.to_owned()
 }
 
-fn env_parse<T: std::str::FromStr>(key: &str) -> T {
-    env_get(key).parse().unwrap_or_else(|_| {
-        let msg = format!("Failed to parse: {}", key);
-        panic!("{msg}")
-    })
+fn env_parse<T>(key: &str) -> Result<T, StartupError>
+where
+    T: std::str::FromStr,
+    <T as std::str::FromStr>::Err: std::fmt::Display,
+{
+    env_get(key)?
+        .parse::<T>()
+        .map_err(|e| StartupError::Config(format!("Failed to parse {} : {}", key, e)))
 }

@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::{Path, State, rejection::JsonRejection},
-    http::StatusCode
+    http::StatusCode,
 };
 
 use crate::{

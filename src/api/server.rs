@@ -19,7 +19,7 @@ pub async fn start(config: Config, state: SharedState) {
 }
 
 pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
-    let addr = config.service_socket_address();
+    let addr = config.service_socket_address()?;
     TcpListener::bind(addr)
         .await
         .map_err(|e| StartupError::Server(e.to_string()))
