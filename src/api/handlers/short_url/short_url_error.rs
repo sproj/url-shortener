@@ -56,8 +56,7 @@ impl From<&ShortUrlError> for ApiError {
                 ApiError::new("internal database error").kind(ApiErrorKind::Internal)
             }
             ShortUrlError::CodeGenerationExhausted => {
-                ApiError::new("failed to generate a code")
-                    .kind(ApiErrorKind::Internal)
+                ApiError::new("failed to generate a code").kind(ApiErrorKind::Internal)
             }
         }
     }
