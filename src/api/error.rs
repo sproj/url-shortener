@@ -23,7 +23,6 @@ impl Display for ApiErrorKind {
         write!(
             f,
             "{}",
-            // serde_json::json!(self).as_str().unwrap_or_default()
             match self {
                 ApiErrorKind::ResourceNotFound => "resource not found",
                 ApiErrorKind::UnprocessableInput => "unprocessable input",
@@ -60,9 +59,9 @@ pub struct ApiError {
 }
 
 impl ApiError {
-    pub fn new(message: &str) -> Self {
+    pub fn new(message: impl Into<String>) -> Self {
         Self {
-            message: message.to_owned(),
+            message: message.into(),
             ..Default::default()
         }
     }

@@ -33,6 +33,6 @@ pub async fn redirect(
 
 fn redirect_response(status: StatusCode, location: &str) -> Result<Response, ApiError> {
     let value = HeaderValue::from_str(location)
-        .map_err(|e| ApiError::new(format!("invalid redirect location: {e}").as_str()))?;
+        .map_err(|e| ApiError::new(format!("invalid redirect location: {e}")))?;
     Ok((status, [(header::LOCATION, value)]).into_response())
 }

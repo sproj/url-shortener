@@ -20,14 +20,6 @@ pub struct DbConfig {
 }
 
 impl Config {
-    pub fn service_host(&self) -> String {
-        format!("{}://{}", "http", self.service_host)
-    }
-
-    pub fn service_http_address(&self) -> String {
-        format!("{}://{}:{}", "http", self.service_host, self.service_port)
-    }
-
     pub fn service_socket_address(&self) -> Result<SocketAddr, StartupError> {
         use std::str::FromStr;
         SocketAddr::from_str(&format!("{}:{}", self.service_host, self.service_port))
