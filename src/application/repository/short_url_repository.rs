@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     application::{repository::RepositoryResult, service::short_url::ShortUrlSpec},
     domain::models::short_url::ShortUrl,
@@ -8,14 +6,12 @@ use deadpool_postgres::{GenericClient, Pool};
 use tokio_postgres::types::{ToSql, Type};
 
 pub struct ShortUrlRepository {
-    pool: Arc<Pool>,
+    pool: Pool,
 }
 
 impl ShortUrlRepository {
     pub fn new(pool: Pool) -> Self {
-        Self {
-            pool: Arc::new(pool),
-        }
+        Self { pool }
     }
 
     pub async fn get_all(&self) -> RepositoryResult<Vec<ShortUrl>> {
