@@ -1,6 +1,6 @@
 pub mod common;
 use common::test_app;
-use hyper::StatusCode;
+use axum::http::StatusCode;
 
 use crate::common::{constants::API_PATH_READY, test_db};
 

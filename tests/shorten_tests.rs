@@ -1,6 +1,6 @@
 use crate::common::{constants::API_PATH_SHORTEN, helpers::pick_error_fields, test_app};
 use chrono::{Duration, Utc};
-use hyper::StatusCode;
+use axum::http::StatusCode;
 use url_shortener::{
     api::{
         error::{ApiError, ApiErrorKind},

@@ -1,8 +1,8 @@
 use axum::{
     Json,
     extract::{Path, State, rejection::JsonRejection},
+    http::StatusCode
 };
-use hyper::StatusCode;
 
 use crate::{
     api::{

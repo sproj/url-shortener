@@ -1,7 +1,7 @@
 pub mod common;
 
 use chrono::{Duration, Utc};
-use hyper::StatusCode;
+use axum::http::StatusCode;
 use url_shortener::api::handlers::short_url::CreateShortUrlResponse;
 use uuid::Uuid;
 

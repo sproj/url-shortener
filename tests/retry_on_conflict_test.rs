@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use hyper::StatusCode;
+use axum::http::StatusCode;
 use url_shortener::{
     api::{
         error::{ApiError, ApiErrorKind},
