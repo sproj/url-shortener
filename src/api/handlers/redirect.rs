@@ -6,8 +6,10 @@ use axum::{
 use hyper::{StatusCode, header};
 
 use crate::{
-    api::{error::ApiError, handlers::short_url::ShortUrlError},
-    application::{service::short_url::short_url_service::RedirectDecision, state::SharedState},
+    api::error::ApiError,
+    application::{
+        ShortUrlError, service::short_url::short_url_service::RedirectDecision, state::SharedState,
+    },
 };
 
 pub async fn redirect(
@@ -33,6 +35,6 @@ pub async fn redirect(
 
 fn redirect_response(status: StatusCode, location: &str) -> Result<Response, ApiError> {
     let value = HeaderValue::from_str(location)
-        .map_err(|e| ApiError::new(format!("invalid redirect location: {e}").as_str()))?;
+        .map_err(|e| ApiError::new(format!("invalid redirect location: {e}")))?;
     Ok((status, [(header::LOCATION, value)]).into_response())
 }

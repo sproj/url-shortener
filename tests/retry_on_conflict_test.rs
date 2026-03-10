@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use hyper::StatusCode;
+use axum::http::StatusCode;
 use url_shortener::{
     api::{
         error::{ApiError, ApiErrorKind},
@@ -84,7 +84,7 @@ async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
 
     let err = response.json::<ApiError>().await.unwrap();
     assert_eq!(err.kind, ApiErrorKind::Internal);
-    assert_eq!(err.message, "failed to generate a code after 5 attempts");
+    assert_eq!(err.message, "failed to generate a code");
 }
 
 async fn seed_existing_short_url_with_code(sut: &test_app::TestApp, code: &str) {

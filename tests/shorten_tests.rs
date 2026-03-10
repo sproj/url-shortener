@@ -1,6 +1,6 @@
 use crate::common::{constants::API_PATH_SHORTEN, helpers::pick_error_fields, test_app};
+use axum::http::StatusCode;
 use chrono::{Duration, Utc};
-use hyper::StatusCode;
 use url_shortener::{
     api::{
         error::{ApiError, ApiErrorKind},
@@ -359,8 +359,8 @@ async fn delete_shorturl_by_id_succeeds() {
 
     assert_eq!(delete.status(), StatusCode::OK);
 
-    let delete_response = delete.json::<bool>().await.unwrap();
-    assert_eq!(delete_response, true);
+    let delete_response = delete.json::<String>().await.unwrap();
+    assert_eq!(delete_response, created.id.to_string());
 }
 
 #[tokio::test]

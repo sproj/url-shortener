@@ -8,8 +8,8 @@ use crate::{
 
 #[derive(Debug, Error)]
 pub enum ShortUrlError {
-    #[error("short_url not found: {0}")] // todo: I do not get how this macro works
-    NotFound(String), // todo: short_url should have a uuid so the database id is not exposed
+    #[error("short_url not found: {0}")]
+    NotFound(String),
     #[error("invalid input: {0}")]
     UnprocessableInput(String),
     #[error("invalid input url: {0:?}")]
@@ -56,8 +56,7 @@ impl From<&ShortUrlError> for ApiError {
                 ApiError::new("internal database error").kind(ApiErrorKind::Internal)
             }
             ShortUrlError::CodeGenerationExhausted => {
-                ApiError::new("failed to generate a code after 5 attempts")
-                    .kind(ApiErrorKind::Internal)
+                ApiError::new("failed to generate a code").kind(ApiErrorKind::Internal)
             }
         }
     }

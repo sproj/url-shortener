@@ -1,18 +1,18 @@
 use axum::{
     Json,
     extract::{Path, State, rejection::JsonRejection},
+    http::StatusCode,
 };
-use hyper::StatusCode;
 
 use crate::{
     api::{
         error::ApiError,
         handlers::short_url::{
-            ShortUrlError, create_short_url_request::CreateShortUrlRequest,
+            ValidatedCreateShortUrlRequest, create_short_url_request::CreateShortUrlRequest,
             create_short_url_response::CreateShortUrlResponse,
         },
     },
-    application::state::SharedState,
+    application::{ShortUrlError, state::SharedState},
     domain::models::short_url::ShortUrl,
 };
 
@@ -62,7 +62,9 @@ pub async fn add_one(
     let Json(parsed_input) =
         req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
 
-    let created = state.short_url.add_one(parsed_input).await?;
+    let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
+
+    let created = state.short_url.add_one(dto).await?;
     println!("shorturl_handler::add_one created: {:?}", created);
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
@@ -74,11 +76,11 @@ pub async fn add_one(
 pub async fn delete_one_by_id(
     State(state): State<SharedState>,
     Path(id): Path<i64>,
-) -> Result<Json<bool>, ApiError> {
+) -> Result<Json<String>, ApiError> {
     println!("shorturl_handler::delete_one called with {}", id);
-    if let Some(deleted_count) = state.short_url.delete_one_by_id(id).await? {
+    if state.short_url.delete_one_by_id(id).await? {
         println!("shorturl_handler::delete_one returning Ok");
-        Ok(Json(deleted_count))
+        Ok(Json(id.to_string()))
     } else {
         eprintln!("shorturl_handler::delete_one returning ShortUrlError");
         Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))

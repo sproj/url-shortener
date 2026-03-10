@@ -1,6 +1,6 @@
 pub mod common;
+use axum::http::StatusCode;
 use common::test_app;
-use hyper::StatusCode;
 
 #[tokio::test]
 async fn positive_404() {

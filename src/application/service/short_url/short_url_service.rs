@@ -1,15 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    api::handlers::short_url::{
-        CreateShortUrlRequest, ShortUrlError, ValidatedCreateShortUrlRequest,
-    },
+    api::handlers::short_url::ValidatedCreateShortUrlRequest,
     application::{
+        ShortUrlError,
         repository::{database_error::DatabaseError, short_url_repository::ShortUrlRepository},
-        service::short_url::{
-            ShortUrlSpec,
-            code_generator::{CodeGenerator, RandomCodeGenerator},
-        },
+        service::short_url::{ShortUrlSpec, code_generator::CodeGenerator},
     },
     domain::models::short_url::ShortUrl,
 };
@@ -30,14 +26,6 @@ pub enum RedirectDecision {
 }
 
 impl ShortUrlService {
-    pub fn new(repository: ShortUrlRepository) -> Self {
-        Self {
-            repository: Arc::new(repository),
-            code_generator: Arc::new(RandomCodeGenerator),
-            max_retries: 5,
-        }
-    }
-
     pub fn new_with_generator(
         repository: ShortUrlRepository,
         code_generator: Arc<dyn CodeGenerator>,
@@ -62,27 +50,27 @@ impl ShortUrlService {
         self.repository.get_by_code(code).await
     }
 
-    pub async fn delete_one_by_id(&self, id: i64) -> Result<Option<bool>, DatabaseError> {
+    pub async fn delete_one_by_id(&self, id: i64) -> Result<bool, DatabaseError> {
         self.repository.delete_one_by_id(id).await
     }
 
-    pub async fn add_one(&self, input: CreateShortUrlRequest) -> Result<ShortUrl, ShortUrlError> {
-        println!("shorturl_service::add_one called with {:?}", input);
-
-        let dto: ValidatedCreateShortUrlRequest = input.try_into()?;
-
-        println!("shorturl_service::add_one created dto {:?}", dto);
+    pub async fn add_one(
+        &self,
+        dto: ValidatedCreateShortUrlRequest,
+    ) -> Result<ShortUrl, ShortUrlError> {
+        println!("shorturl_service::add_one called with {:?}", dto);
 
         // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
         let uuid = uuid::Uuid::now_v7();
+
         for attempt in 1..=self.max_retries {
-            let mut spec: ShortUrlSpec = ShortUrlSpec::from(dto.clone());
+            let spec = ShortUrlSpec {
+                long_url: dto.long_url.clone(),
+                expires_at: dto.expires_at,
+                uuid,
+                code: self.code_generator.next_code(),
+            };
             println!("shorturl_service::add_one created spec {:?}", spec);
-
-            let code = self.code_generator.next_code();
-
-            spec.code = Some(code);
-            spec.uuid = Some(uuid);
 
             println!("Attempt {attempt} insert of new short_url: {:?}", spec);
 
