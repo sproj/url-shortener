@@ -11,7 +11,5 @@ async fn health_test() {
     let body = response.text().await.unwrap();
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
 
-    println!("{:?}", json);
-
     assert_eq!(json["status"], "healthy");
 }

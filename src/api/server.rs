@@ -12,8 +12,8 @@ use axum::{
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
 
-pub async fn start(config: Config, state: SharedState) {
-    let listener = listen(config).await.unwrap();
+pub async fn start(config: Config, state: SharedState) -> Result<(), StartupError> {
+    let listener = listen(config).await?;
 
     serve(listener, state).await
 }
@@ -25,7 +25,7 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
         .map_err(|e| StartupError::Server(e.to_string()))
 }
 
-pub async fn serve(listener: TcpListener, state: SharedState) {
+pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
     let router = Router::new()
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
@@ -37,7 +37,7 @@ pub async fn serve(listener: TcpListener, state: SharedState) {
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .unwrap()
+        .map_err(|e| StartupError::Server(e.to_string()))
 }
 
 // health request handler
@@ -47,7 +47,7 @@ async fn health_handler() -> Result<impl IntoResponse, ()> {
 
 // 404 handler
 async fn error_404_handler(request: Request) -> impl IntoResponse {
-    println!("route not found: {:?}", request);
+    tracing::warn!(method = %request.method(), path = %request.uri().path(), "route not found");
     StatusCode::NOT_FOUND
 }
 

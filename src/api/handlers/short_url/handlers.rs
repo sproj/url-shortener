@@ -17,9 +17,8 @@ use crate::{
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
-    println!("shorturl_handler::get_all called");
     let short_urls = state.short_url.get_all().await?;
-    println!("shorturl_handler::get_all returning");
+    tracing::debug!(?short_urls, "get all ok");
     Ok(Json(short_urls))
 }
 
@@ -27,12 +26,12 @@ pub async fn get_one_by_id(
     State(state): State<SharedState>,
     Path(id): Path<i64>,
 ) -> Result<Json<ShortUrl>, ApiError> {
-    println!("shorturl_handler::get_one_by_id called with {}", id);
+    tracing::debug!(%id, "get one by id");
     if let Some(short) = state.short_url.get_by_id(id).await? {
-        println!("shorturl_handler::get_one_by_id returning Ok");
+        tracing::debug!(?short, "ok");
         Ok(Json(short))
     } else {
-        eprintln!("shorturl_handler::get_one_by_id returning ShortUrlError");
+        tracing::warn!(%id, "not found");
         Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))
     }
 }
@@ -41,12 +40,12 @@ pub async fn get_one_by_code(
     State(state): State<SharedState>,
     Path(code): Path<String>,
 ) -> Result<Json<ShortUrl>, ApiError> {
-    println!("shorturl_handler::get_one_by_code called with {}", &code);
+    tracing::debug!(%code, "get one by code");
     if let Some(short) = state.short_url.get_by_code(&code).await? {
-        println!("short_url_handler::get_one_by_code returning Ok");
+        tracing::debug!(%short, "ok");
         Ok(Json(short))
     } else {
-        eprintln!("short_url_handler::get_one_by_code returning ShortUrlError");
+        tracing::warn!(%code, "not found");
         Err(ApiError::from(ShortUrlError::NotFound(code)))
     }
 }
@@ -65,10 +64,9 @@ pub async fn add_one(
     let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
 
     let created = state.short_url.add_one(dto).await?;
-    println!("shorturl_handler::add_one created: {:?}", created);
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
-    println!("shorturl_handler::add_one returning Ok: {:?}", payload);
+    tracing::debug!(%payload, "ok");
 
     Ok((StatusCode::CREATED, Json(payload)))
 }
@@ -77,12 +75,11 @@ pub async fn delete_one_by_id(
     State(state): State<SharedState>,
     Path(id): Path<i64>,
 ) -> Result<Json<String>, ApiError> {
-    println!("shorturl_handler::delete_one called with {}", id);
     if state.short_url.delete_one_by_id(id).await? {
-        println!("shorturl_handler::delete_one returning Ok");
+        tracing::debug!(%id, "ok");
         Ok(Json(id.to_string()))
     } else {
-        eprintln!("shorturl_handler::delete_one returning ShortUrlError");
+        tracing::warn!(%id, "not found");
         Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))
     }
 }

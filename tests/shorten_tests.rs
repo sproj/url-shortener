@@ -123,7 +123,6 @@ async fn mal_formed_json_payload_returns_expected_error() {
         .unwrap();
     let status = actual.status();
     let err = actual.json::<ApiError>().await.unwrap();
-    dbg!("{:?}", &err);
 
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(err.kind, ApiErrorKind::UnprocessableInput);
@@ -152,7 +151,6 @@ async fn well_formed_json_but_invalid_create_request_returns_expected_error() {
         .unwrap();
     let status = actual.status();
     let err = actual.json::<ApiError>().await.unwrap();
-    dbg!("{:?}", &err);
 
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(err.kind, ApiErrorKind::UnprocessableInput);
@@ -207,7 +205,6 @@ async fn excessively_long_url_returns_correct_error() {
     let actual = client.post(url).json(&input).send().await.unwrap();
     let status = actual.status();
     let err: ApiError = actual.json().await.unwrap();
-    dbg!("{:?}", &err);
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(err.kind, ApiErrorKind::ValidationError);

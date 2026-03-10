@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
@@ -23,6 +25,16 @@ impl ShortUrl {
 
     pub fn is_deleted(&self) -> bool {
         self.deleted_at.is_some()
+    }
+}
+
+impl Display for ShortUrl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "uuid: {}, code: {}, long_url: {}, expires_at: {:?}, deleted_at: {:?}",
+            self.uuid, self.code, self.long_url, self.expires_at, self.deleted_at
+        )
     }
 }
 
