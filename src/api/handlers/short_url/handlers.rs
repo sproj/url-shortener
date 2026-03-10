@@ -8,7 +8,7 @@ use crate::{
     api::{
         error::ApiError,
         handlers::short_url::{
-            create_short_url_request::CreateShortUrlRequest,
+            ValidatedCreateShortUrlRequest, create_short_url_request::CreateShortUrlRequest,
             create_short_url_response::CreateShortUrlResponse,
         },
     },
@@ -62,7 +62,9 @@ pub async fn add_one(
     let Json(parsed_input) =
         req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
 
-    let created = state.short_url.add_one(parsed_input).await?;
+    let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
+
+    let created = state.short_url.add_one(dto).await?;
     println!("shorturl_handler::add_one created: {:?}", created);
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);

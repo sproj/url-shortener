@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    api::handlers::short_url::{CreateShortUrlRequest, ValidatedCreateShortUrlRequest},
+    api::handlers::short_url::ValidatedCreateShortUrlRequest,
     application::{
         ShortUrlError,
         repository::{database_error::DatabaseError, short_url_repository::ShortUrlRepository},
@@ -54,12 +54,11 @@ impl ShortUrlService {
         self.repository.delete_one_by_id(id).await
     }
 
-    pub async fn add_one(&self, input: CreateShortUrlRequest) -> Result<ShortUrl, ShortUrlError> {
-        println!("shorturl_service::add_one called with {:?}", input);
-
-        let dto: ValidatedCreateShortUrlRequest = input.try_into()?;
-
-        println!("shorturl_service::add_one created dto {:?}", dto);
+    pub async fn add_one(
+        &self,
+        dto: ValidatedCreateShortUrlRequest,
+    ) -> Result<ShortUrl, ShortUrlError> {
+        println!("shorturl_service::add_one called with {:?}", dto);
 
         // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
         let uuid = uuid::Uuid::now_v7();
