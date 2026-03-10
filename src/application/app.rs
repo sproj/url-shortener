@@ -33,21 +33,21 @@ impl App {
 
     pub async fn migrate(self) -> Result<Self, StartupError> {
         let report = Self::run_migrations(&self.state).await?;
-        println!("{:?}", report.applied_migrations());
+        tracing::info!(?report, "Migrations applied");
         Ok(self)
     }
 
     pub async fn start(self) -> Result<(), StartupError> {
         if self.auto_migrate {
             let report = Self::run_migrations(&self.state).await?;
-            println!("{:?}", report.applied_migrations());
+            tracing::info!(?report, "Migrations applied");
         }
 
         Self::run_server(self.config, self.state).await
     }
 
     async fn run_migrations(state: &SharedState) -> Result<refinery::Report, StartupError> {
-        println!("Running migrations");
+        tracing::info!("Running migrations");
         let mut conn = state.db_pool.get().await?;
         let client = conn.deref_mut().deref_mut();
         embedded::migrations::runner()
@@ -57,9 +57,8 @@ impl App {
     }
 
     async fn run_server(config: Config, state: SharedState) -> Result<(), StartupError> {
-        println!("Starting server");
-        server::start(config, state).await;
-        Ok(())
+        tracing::info!("Starting server");
+        server::start(config, state).await
     }
 }
 
@@ -122,12 +121,12 @@ impl AppBuilder {
     }
 
     fn load_config() -> Result<Config, StartupError> {
-        println!("Loading config");
+        tracing::info!("Loading config");
         crate::application::config::load()
     }
 
     fn create_db_pool(config: &Config) -> Result<Pool, StartupError> {
-        println!("Creating database connection pool");
+        tracing::info!("Creating database connection pool");
         let mut pg = PgConfig::new();
         pg.user = Some(config.db.postgres_user.clone());
         pg.password = Some(config.db.postgres_password.clone());

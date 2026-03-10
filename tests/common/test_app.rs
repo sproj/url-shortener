@@ -30,7 +30,7 @@ impl TestApp {
 
     pub fn build_path(&self, path: &str) -> reqwest::Url {
         let url = format!("http://{}/{}", self.socket_address, path);
-        dbg!("building url: {}", &url);
+        tracing::info!(%url, "building url");
         reqwest::Url::parse(&url).unwrap()
     }
 }
@@ -92,7 +92,7 @@ impl TestAppBuilder {
 
         let listener = server::listen(config).await.unwrap();
         let addr = listener.local_addr().unwrap();
-        dbg!(format!("test_app will listen on port: {}", &addr));
+        tracing::info!(%addr, "test app listening");
 
         tokio::spawn(server::serve(listener, state.clone()));
 

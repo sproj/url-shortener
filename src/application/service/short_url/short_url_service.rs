@@ -58,8 +58,6 @@ impl ShortUrlService {
         &self,
         dto: ValidatedCreateShortUrlRequest,
     ) -> Result<ShortUrl, ShortUrlError> {
-        println!("shorturl_service::add_one called with {:?}", dto);
-
         // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
         let uuid = uuid::Uuid::now_v7();
 
@@ -70,13 +68,11 @@ impl ShortUrlService {
                 uuid,
                 code: self.code_generator.next_code(),
             };
-            println!("shorturl_service::add_one created spec {:?}", spec);
 
-            println!("Attempt {attempt} insert of new short_url: {:?}", spec);
+            tracing::debug!(%attempt, %spec);
 
             match self.repository.add_one(spec).await {
                 Ok(created) => {
-                    println!("shorturl_service::add_one returning: {:?}", created);
                     return Ok(created);
                 }
                 Err(DatabaseError::Conflict {
@@ -84,9 +80,8 @@ impl ShortUrlService {
                     constraint,
                     message,
                 }) => {
-                    println!(
-                        "shorturl_service::add_one conflict on attempt {}: {:?}, {}",
-                        attempt, state, &message
+                    tracing::warn!(
+                        %attempt, ?state, %message, "conflict"
                     );
                     let is_code_conflict = matches!(
                         constraint.as_deref(),
@@ -103,11 +98,12 @@ impl ShortUrlService {
                     }
                 }
                 Err(e) => {
-                    eprintln!("database error when inserting short_url: {:?}", e);
+                    tracing::error!(%e, "short url insertion error");
                     return Err(ShortUrlError::Storage(e));
                 }
             }
         }
+        tracing::error!(%dto, "code generation exhausted");
         Err(ShortUrlError::CodeGenerationExhausted)
     }
 

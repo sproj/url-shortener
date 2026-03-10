@@ -26,7 +26,7 @@ impl ShortUrlRepository {
     }
 
     pub async fn get_by_id(&self, id: i64) -> RepositoryResult<Option<ShortUrl>> {
-        println!("short url_repository::get_by_id called with {}", id);
+        tracing::debug!(%id, "get by id");
         self.pool
         .get()
         .await?
@@ -37,7 +37,7 @@ impl ShortUrlRepository {
     }
 
     pub async fn get_by_code(&self, code: &str) -> RepositoryResult<Option<ShortUrl>> {
-        println!("ShortUrlRepository::get_by_code called with {}", &code);
+        tracing::debug!(%code, "get by code");
         self.pool.get().await?
         .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE code = $1", &[&code])
         .await?
@@ -46,7 +46,7 @@ impl ShortUrlRepository {
     }
 
     pub async fn add_one(&self, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
-        println!("short url_repository::add_one called with {:?}", spec);
+        tracing::debug!(%spec, "insert spec");
 
         let client = self.pool.get().await?;
 
@@ -68,7 +68,7 @@ impl ShortUrlRepository {
     }
 
     pub async fn delete_one_by_id(&self, id: i64) -> RepositoryResult<bool> {
-        println!("short url_repository::delete_one_by_id called with {}", id);
+        tracing::debug!(%id, "delete by id");
         let client = self.pool.get().await?;
 
         let delete_statement = client
@@ -78,6 +78,8 @@ impl ShortUrlRepository {
         let deleted_count = client
             .execute(&delete_statement, &[&Utc::now(), &id])
             .await?;
+
+        tracing::debug!(%deleted_count);
         if deleted_count == 0 {
             Ok(false)
         } else {

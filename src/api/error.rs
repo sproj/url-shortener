@@ -92,7 +92,7 @@ impl std::error::Error for ApiError {}
 
 impl From<DatabaseError> for ApiError {
     fn from(error: DatabaseError) -> Self {
-        eprintln!("Database error: {:?}", error);
+        tracing::error!(%error, "database error",);
         Self {
             message: "database operation failed".to_string(),
             kind: ApiErrorKind::Internal,
@@ -103,7 +103,6 @@ impl From<DatabaseError> for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        dbg!(format!("Error response: {:?}", &self));
         let status_code = self.kind.status_code();
         (status_code, Json(self)).into_response()
     }
