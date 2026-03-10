@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    api::handlers::short_url::{
-        CreateShortUrlRequest, ShortUrlError, ValidatedCreateShortUrlRequest,
-    },
+    api::handlers::short_url::{CreateShortUrlRequest, ValidatedCreateShortUrlRequest},
     application::{
+        ShortUrlError,
         repository::{database_error::DatabaseError, short_url_repository::ShortUrlRepository},
         service::short_url::{ShortUrlSpec, code_generator::CodeGenerator},
     },

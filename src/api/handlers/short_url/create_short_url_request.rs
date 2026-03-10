@@ -2,7 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::{
-    api::handlers::short_url::{ShortUrlError, ValidatedCreateShortUrlRequest},
+    api::handlers::short_url::ValidatedCreateShortUrlRequest,
+    application::ShortUrlError,
     domain::validation_issue::{ValidationIssue, ValidationRule},
 };
 

@@ -6,8 +6,10 @@ use axum::{
 use hyper::{StatusCode, header};
 
 use crate::{
-    api::{error::ApiError, handlers::short_url::ShortUrlError},
-    application::{service::short_url::short_url_service::RedirectDecision, state::SharedState},
+    api::error::ApiError,
+    application::{
+        ShortUrlError, service::short_url::short_url_service::RedirectDecision, state::SharedState,
+    },
 };
 
 pub async fn redirect(

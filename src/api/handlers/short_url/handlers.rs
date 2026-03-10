@@ -8,11 +8,11 @@ use crate::{
     api::{
         error::ApiError,
         handlers::short_url::{
-            ShortUrlError, create_short_url_request::CreateShortUrlRequest,
+            create_short_url_request::CreateShortUrlRequest,
             create_short_url_response::CreateShortUrlResponse,
         },
     },
-    application::state::SharedState,
+    application::{ShortUrlError, state::SharedState},
     domain::models::short_url::ShortUrl,
 };
 
