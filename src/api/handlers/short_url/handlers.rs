@@ -74,11 +74,11 @@ pub async fn add_one(
 pub async fn delete_one_by_id(
     State(state): State<SharedState>,
     Path(id): Path<i64>,
-) -> Result<Json<bool>, ApiError> {
+) -> Result<Json<String>, ApiError> {
     println!("shorturl_handler::delete_one called with {}", id);
-    if let Some(deleted_count) = state.short_url.delete_one_by_id(id).await? {
+    if state.short_url.delete_one_by_id(id).await? {
         println!("shorturl_handler::delete_one returning Ok");
-        Ok(Json(deleted_count))
+        Ok(Json(id.to_string()))
     } else {
         eprintln!("shorturl_handler::delete_one returning ShortUrlError");
         Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))

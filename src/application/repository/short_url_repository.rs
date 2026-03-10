@@ -2,6 +2,7 @@ use crate::{
     application::{repository::RepositoryResult, service::short_url::ShortUrlSpec},
     domain::models::short_url::ShortUrl,
 };
+use chrono::Utc;
 use deadpool_postgres::{GenericClient, Pool};
 use tokio_postgres::types::{ToSql, Type};
 
@@ -17,7 +18,7 @@ impl ShortUrlRepository {
     pub async fn get_all(&self) -> RepositoryResult<Vec<ShortUrl>> {
         let client = self.pool.get().await?;
 
-        let rows = client.query("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url", &[]).await?;
+        let rows = client.query("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE deleted_at is NULL", &[]).await?;
 
         rows.into_iter()
             .map(ShortUrl::try_from)
@@ -58,31 +59,29 @@ impl ShortUrlRepository {
             )
             .await?;
 
-        let params: &[&(dyn ToSql + Sync); 4] = &[
-            &spec.uuid.expect("uuid missing"),
-            &spec.code.expect("code missing"),
-            &spec.long_url,
-            &spec.expires_at,
-        ];
+        let params: &[&(dyn ToSql + Sync); 4] =
+            &[&spec.uuid, &spec.code, &spec.long_url, &spec.expires_at];
 
         let inserted_long_url_row = client.query_one(&insert_long_url, params).await?;
 
         inserted_long_url_row.try_into()
     }
 
-    pub async fn delete_one_by_id(&self, id: i64) -> RepositoryResult<Option<bool>> {
+    pub async fn delete_one_by_id(&self, id: i64) -> RepositoryResult<bool> {
         println!("short url_repository::delete_one_by_id called with {}", id);
         let client = self.pool.get().await?;
 
         let delete_statement = client
-            .prepare("DELETE from short_url WHERE id = $1")
+            .prepare("UPDATE short_url SET deleted_at = $1 WHERE id = $2")
             .await?;
 
-        let deleted_count = client.execute(&delete_statement, &[&id]).await?;
+        let deleted_count = client
+            .execute(&delete_statement, &[&Utc::now(), &id])
+            .await?;
         if deleted_count == 0 {
-            Ok(None)
+            Ok(false)
         } else {
-            Ok(Some(true))
+            Ok(true)
         }
     }
 }

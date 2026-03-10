@@ -359,8 +359,8 @@ async fn delete_shorturl_by_id_succeeds() {
 
     assert_eq!(delete.status(), StatusCode::OK);
 
-    let delete_response = delete.json::<bool>().await.unwrap();
-    assert_eq!(delete_response, true);
+    let delete_response = delete.json::<String>().await.unwrap();
+    assert_eq!(delete_response, created.id.to_string());
 }
 
 #[tokio::test]
