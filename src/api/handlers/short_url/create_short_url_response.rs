@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter, Result};
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -22,5 +24,15 @@ impl From<ShortUrl> for CreateShortUrlResponse {
             long_url: value.long_url,
             expires_at: value.expires_at,
         }
+    }
+}
+
+impl Display for CreateShortUrlResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "uuid: {}, code: {}, long_url: {}, expires_at: {:?}",
+            self.uuid, self.code, self.long_url, self.expires_at
+        )
     }
 }
