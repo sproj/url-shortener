@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use deadpool_postgres::Pool;
+use redis::aio::MultiplexedConnection;
+use tokio::sync::Mutex;
 
 use crate::application::{
     repository::short_url_repository::ShortUrlRepository,
@@ -32,12 +34,13 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn build(self, db_pool: Pool) -> AppState {
+    pub fn build(self, db_pool: Pool, redis: Mutex<MultiplexedConnection>) -> AppState {
         let short_url_repository = ShortUrlRepository::new(db_pool.clone());
-        let short_url_service = Arc::new(ShortUrlService::new_with_generator(
+        let short_url_service = Arc::new(ShortUrlService::new(
             short_url_repository,
             self.code_generator,
             self.max_retries,
+            redis,
         ));
 
         AppState {

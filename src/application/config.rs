@@ -4,9 +4,13 @@ use crate::application::startup_error::StartupError;
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    // Rest API configuration
     pub service_host: String,
     pub service_port: u16,
+    // PostgreSQL configuration
     pub db: DbConfig,
+    // Redis configuration.
+    pub redis: RedisConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -19,11 +23,24 @@ pub struct DbConfig {
     pub postgres_connection_pool: u32,
 }
 
+#[derive(Clone, Debug)]
+pub struct RedisConfig {
+    pub redis_host: String,
+    pub redis_port: u16,
+}
+
 impl Config {
     pub fn service_socket_address(&self) -> Result<SocketAddr, StartupError> {
         use std::str::FromStr;
         SocketAddr::from_str(&format!("{}:{}", self.service_host, self.service_port))
             .map_err(|e| StartupError::Server(e.to_string()))
+    }
+
+    pub fn redis_url(&self) -> String {
+        format!(
+            "redis://{}:{}",
+            self.redis.redis_host, self.redis.redis_port
+        )
     }
 }
 
@@ -53,6 +70,10 @@ pub fn load() -> Result<Config, StartupError> {
             postgres_port: env_parse("POSTGRES_PORT")?,
             postgres_db: env_get("POSTGRES_DB")?,
             postgres_connection_pool: env_parse("POSTGRES_CONNECTION_POOL")?,
+        },
+        redis: RedisConfig {
+            redis_host: env_get("REDIS_HOST")?,
+            redis_port: env_parse("REDIS_PORT")?,
         },
     };
 

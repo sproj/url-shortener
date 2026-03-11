@@ -1,9 +1,8 @@
 use axum::{
     extract::{Path, State},
-    http::{HeaderValue, Method},
+    http::{HeaderValue, Method, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use hyper::{StatusCode, header};
 
 use crate::{
     api::error::ApiError,

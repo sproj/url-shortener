@@ -3,9 +3,12 @@ use std::sync::Arc;
 
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppStateBuilder, SharedState};
+use crate::infrastructure;
 use crate::{api::server, application::config::Config};
 
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
+use redis::aio::MultiplexedConnection;
+use tokio::sync::Mutex;
 use tokio_postgres::NoTls;
 
 pub struct App {
@@ -68,6 +71,7 @@ pub struct AppBuilder {
     state: Option<SharedState>,
     state_builder: AppStateBuilder,
     auto_migrate: bool,
+    redis: Option<MultiplexedConnection>,
 }
 
 impl AppBuilder {
@@ -96,6 +100,11 @@ impl AppBuilder {
         self
     }
 
+    pub async fn with_redis(mut self, redis: MultiplexedConnection) -> Self {
+        self.redis = Some(redis);
+        self
+    }
+
     pub async fn build(self) -> Result<App, StartupError> {
         let config = match self.config {
             Some(config) => config,
@@ -109,7 +118,12 @@ impl AppBuilder {
                     Some(pool) => pool,
                     None => Self::create_db_pool(&config)?,
                 };
-                Arc::new(self.state_builder.build(db_pool))
+                let redis = match self.redis {
+                    Some(conn) => Mutex::new(conn),
+                    None => Mutex::new(Self::create_redis_connection(&config).await?),
+                };
+
+                Arc::new(self.state_builder.build(db_pool, redis))
             }
         };
 
@@ -145,6 +159,12 @@ impl AppBuilder {
         pg.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)
             .map_err(StartupError::DbPoolCreation)
     }
+
+    async fn create_redis_connection(
+        config: &Config,
+    ) -> Result<MultiplexedConnection, StartupError> {
+        infrastructure::redis::connect::connect(config).await
+    }
 }
 
 impl Default for AppBuilder {
@@ -155,6 +175,7 @@ impl Default for AppBuilder {
             state: None,
             state_builder: AppStateBuilder::default(),
             auto_migrate: true,
+            redis: None
         }
     }
 }

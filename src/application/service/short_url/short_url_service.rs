@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use redis::{AsyncCommands, aio::MultiplexedConnection};
+use tokio::sync::Mutex;
+
 use crate::{
     api::handlers::short_url::ValidatedCreateShortUrlRequest,
     application::{
@@ -16,6 +19,7 @@ pub struct ShortUrlService {
     code_generator: Arc<dyn CodeGenerator>,
     max_retries: u8,
     repository: Arc<ShortUrlRepository>,
+    redis: Mutex<MultiplexedConnection>,
 }
 
 pub enum RedirectDecision {
@@ -26,15 +30,17 @@ pub enum RedirectDecision {
 }
 
 impl ShortUrlService {
-    pub fn new_with_generator(
+    pub fn new(
         repository: ShortUrlRepository,
         code_generator: Arc<dyn CodeGenerator>,
         max_retries: u8,
+        redis: Mutex<MultiplexedConnection>,
     ) -> Self {
         ShortUrlService {
             code_generator,
             max_retries,
             repository: Arc::new(repository),
+            redis,
         }
     }
 
@@ -43,6 +49,7 @@ impl ShortUrlService {
     }
 
     pub async fn get_by_id(&self, id: i64) -> Result<Option<ShortUrl>, DatabaseError> {
+        let cache_hit = self.redis.lock().await.get(id).await?;
         self.repository.get_by_id(id).await
     }
 
