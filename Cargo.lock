@@ -3264,6 +3264,7 @@ dependencies = [
 name = "url-shortener"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "base64-url",
  "chrono",
