@@ -73,9 +73,7 @@ impl From<&ShortUrlError> for ApiError {
             }
             ShortUrlError::Cache(e) => {
                 tracing::error!(%e, "cache level error");
-                ApiError::new("cache layer caused error")
-                    .kind(ApiErrorKind::Internal)
-                    .detail(json!(e.to_string()))
+                ApiError::new("cache layer caused error").kind(ApiErrorKind::Internal)
             }
         }
     }

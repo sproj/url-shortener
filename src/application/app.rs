@@ -1,9 +1,11 @@
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use crate::application::service::short_url::{
+    redirect_cache::RedirectCacheChecker, redirect_cache_trait::RedirectCache,
+};
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppStateBuilder, SharedState};
-use crate::infrastructure;
 use crate::{api::server, application::config::Config};
 
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
@@ -99,7 +101,7 @@ impl AppBuilder {
         self
     }
 
-    pub async fn with_redis(mut self, redis: MultiplexedConnection) -> Self {
+    pub fn with_redis(mut self, redis: MultiplexedConnection) -> Self {
         self.redis = Some(redis);
         self
     }
@@ -117,12 +119,15 @@ impl AppBuilder {
                     Some(pool) => pool,
                     None => Self::create_db_pool(&config)?,
                 };
-                let redis = match self.redis {
-                    Some(conn) => conn,
-                    None => Self::create_redis_connection(&config).await?,
+                let state_builder = match self.redis {
+                    Some(conn) => {
+                        let cache: Arc<dyn RedirectCache> =
+                            Arc::new(RedirectCacheChecker::new(conn));
+                        self.state_builder.with_redirect_cache(cache)
+                    }
+                    None => self.state_builder,
                 };
-
-                Arc::new(self.state_builder.build(db_pool, redis))
+                Arc::new(state_builder.build(db_pool))
             }
         };
 
@@ -157,12 +162,6 @@ impl AppBuilder {
 
         pg.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)
             .map_err(StartupError::DbPoolCreation)
-    }
-
-    async fn create_redis_connection(
-        config: &Config,
-    ) -> Result<MultiplexedConnection, StartupError> {
-        infrastructure::redis::connect::connect(config).await
     }
 }
 

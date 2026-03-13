@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{ops::Sub, sync::Arc};
 
+use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -8,8 +9,7 @@ use crate::{
         ShortUrlError,
         repository::short_url_repository::ShortUrlRepository,
         service::short_url::{
-            ShortUrlSpec, code_generator::CodeGenerator, redirect_cache::RedirectCacheChecker,
-            redirect_cache_trait::RedirectCache,
+            ShortUrlSpec, code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
         },
     },
     domain::models::short_url::ShortUrl,
@@ -35,16 +35,16 @@ pub enum RedirectDecision {
 
 impl ShortUrlService {
     pub fn new(
-        repository: ShortUrlRepository,
+        repository: Arc<ShortUrlRepository>,
         code_generator: Arc<dyn CodeGenerator>,
         max_retries: u8,
-        redirect_cache: RedirectCacheChecker,
+        redirect_cache: Arc<dyn RedirectCache>,
     ) -> Self {
         ShortUrlService {
             code_generator,
             max_retries,
-            repository: Arc::new(repository),
-            redirect_cache: Arc::new(redirect_cache),
+            repository,
+            redirect_cache,
         }
     }
 
@@ -63,8 +63,26 @@ impl ShortUrlService {
         self.repository.get_by_code(code).await
     }
 
-    pub async fn delete_one_by_id(&self, id: i64) -> Result<bool, DatabaseError> {
-        self.repository.delete_one_by_id(id).await
+    pub async fn delete_one_by_id(&self, id: i64) -> Result<bool, ShortUrlError> {
+        let rec = match self.repository.get_by_id(id).await {
+            Ok(Some(short)) => short,
+            Ok(None) => return Err(ShortUrlError::NotFound(id.to_string())),
+            Err(e) => return Err(ShortUrlError::from(e)),
+        };
+
+        let deleted_code = rec.code;
+
+        tracing::info!(%id, "soft deleting ShortUrl with id");
+        let delete_result = self.repository.delete_one_by_id(id).await?;
+
+        tracing::info!(%deleted_code, "removing code from cache");
+        match self.redirect_cache.delete(&deleted_code).await {
+            Ok(()) => Ok(delete_result),
+            Err(e) => {
+                tracing::error!(%e, "Failed to invalidate cache after deleting record");
+                Ok(delete_result)
+            }
+        }
     }
 
     pub async fn add_one(
@@ -125,6 +143,7 @@ impl ShortUrlService {
         code: &str,
     ) -> Result<RedirectDecision, ShortUrlError> {
         let cache_result = self.redirect_cache.get(code).await;
+        tracing::debug!(?cache_result, "cache result");
         if let Ok(Some(cache_hit)) = cache_result {
             tracing::info!(%code, "cache hit");
             return Ok(cache_hit);
@@ -136,12 +155,42 @@ impl ShortUrlService {
             None => Ok(RedirectDecision::NotFound),
             Some(short) if short.is_deleted() => Ok(RedirectDecision::Gone),
             Some(short) if short.is_expired() => Ok(RedirectDecision::Gone),
-            Some(short) if short.expires_at.is_none() => Ok(RedirectDecision::Permanent {
-                long_url: short.long_url,
-            }),
-            Some(short) => Ok(RedirectDecision::Temporary {
-                long_url: short.long_url,
-            }),
+            Some(short) if short.expires_at.is_none() => {
+                let decision = RedirectDecision::Permanent {
+                    long_url: short.long_url,
+                };
+                if let Err(e) = self
+                    .redirect_cache
+                    .set(code, &decision, std::time::Duration::from_secs(3600 * 6))
+                    .await
+                {
+                    tracing::error!(%e, ?decision, "failed to write redirect decision to cache");
+                }
+                Ok(decision)
+            }
+            Some(short) => {
+                let decision = RedirectDecision::Temporary {
+                    long_url: short.long_url,
+                };
+                let expires_seconds = match short.expires_at {
+                    Some(time) => time
+                        .sub(Utc::now())
+                        .clamp(TimeDelta::seconds(1), TimeDelta::minutes(15)),
+                    None => TimeDelta::minutes(15),
+                };
+                if let Err(e) = self
+                    .redirect_cache
+                    .set(
+                        code,
+                        &decision,
+                        std::time::Duration::from_secs(expires_seconds.num_seconds() as u64),
+                    )
+                    .await
+                {
+                    tracing::error!(%e, ?decision, "failed to write redirect decision to cache");
+                }
+                Ok(decision)
+            }
         }
     }
 }
