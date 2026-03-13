@@ -12,4 +12,6 @@ pub enum StartupError {
     DbMigrations(#[from] refinery::Error),
     #[error("server startup error")]
     Server(String),
+    #[error("redis startup error")]
+    RedisConnection(String),
 }

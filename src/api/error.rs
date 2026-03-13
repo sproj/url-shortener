@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result};
 
-use crate::application::repository::database_error::DatabaseError;
+use crate::infrastructure::database::database_error::DatabaseError;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

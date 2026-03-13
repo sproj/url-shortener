@@ -1,9 +1,10 @@
+use serde_json::json;
 use thiserror::Error;
 
 use crate::{
     api::error::{ApiError, ApiErrorKind},
-    application::repository::database_error::DatabaseError,
     domain::validation_issue::ValidationIssue,
+    infrastructure::{database::database_error::DatabaseError, redis::cache_error::CacheError},
 };
 
 #[derive(Debug, Error)]
@@ -18,6 +19,8 @@ pub enum ShortUrlError {
     Storage(DatabaseError),
     #[error("code generation exhausted")]
     CodeGenerationExhausted,
+    #[error("redis error: {0}")]
+    Cache(#[from] CacheError),
 }
 
 impl From<DatabaseError> for ShortUrlError {
@@ -41,13 +44,13 @@ impl From<&ShortUrlError> for ApiError {
                 tracing::info!(%short_url_error);
                 ApiError::new(short_url_error_message)
                     .kind(ApiErrorKind::ResourceNotFound)
-                    .detail(serde_json::json!({ "not_found": id_or_code }))
+                    .detail(json!({ "not_found": id_or_code }))
             }
             ShortUrlError::UnprocessableInput(msg) => {
                 tracing::warn!(%short_url_error, "unprocessable user input");
                 ApiError::new("unprocessable_input")
                     .kind(ApiErrorKind::UnprocessableInput)
-                    .detail(serde_json::json!({"invalid_input_url": [{
+                    .detail(json!({"invalid_input_url": [{
                             "field": "request_body",
                             "code": "parse_create_short_url_input_fail",
                             "message": msg
@@ -58,7 +61,7 @@ impl From<&ShortUrlError> for ApiError {
                 tracing::warn!(%short_url_error, "invalid user input");
                 ApiError::new("input url is invalid")
                     .kind(ApiErrorKind::ValidationError)
-                    .detail(serde_json::json!({"invalid_input_url": issues}))
+                    .detail(json!({"invalid_input_url": issues}))
             }
             ShortUrlError::Storage(e) => {
                 tracing::error!(%e, "unexpected database error");
@@ -67,6 +70,10 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::CodeGenerationExhausted => {
                 tracing::error!(%short_url_error, "code generation exhausted");
                 ApiError::new("failed to generate a code").kind(ApiErrorKind::Internal)
+            }
+            ShortUrlError::Cache(e) => {
+                tracing::error!(%e, "cache level error");
+                ApiError::new("cache layer caused error").kind(ApiErrorKind::Internal)
             }
         }
     }

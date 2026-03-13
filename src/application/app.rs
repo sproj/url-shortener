@@ -1,11 +1,15 @@
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use crate::application::service::short_url::{
+    redirect_cache::RedirectCacheChecker, redirect_cache_trait::RedirectCache,
+};
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppStateBuilder, SharedState};
 use crate::{api::server, application::config::Config};
 
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
+use redis::aio::MultiplexedConnection;
 use tokio_postgres::NoTls;
 
 pub struct App {
@@ -68,6 +72,7 @@ pub struct AppBuilder {
     state: Option<SharedState>,
     state_builder: AppStateBuilder,
     auto_migrate: bool,
+    redis: Option<MultiplexedConnection>,
 }
 
 impl AppBuilder {
@@ -96,6 +101,11 @@ impl AppBuilder {
         self
     }
 
+    pub fn with_redis(mut self, redis: MultiplexedConnection) -> Self {
+        self.redis = Some(redis);
+        self
+    }
+
     pub async fn build(self) -> Result<App, StartupError> {
         let config = match self.config {
             Some(config) => config,
@@ -109,7 +119,15 @@ impl AppBuilder {
                     Some(pool) => pool,
                     None => Self::create_db_pool(&config)?,
                 };
-                Arc::new(self.state_builder.build(db_pool))
+                let state_builder = match self.redis {
+                    Some(conn) => {
+                        let cache: Arc<dyn RedirectCache> =
+                            Arc::new(RedirectCacheChecker::new(conn));
+                        self.state_builder.with_redirect_cache(cache)
+                    }
+                    None => self.state_builder,
+                };
+                Arc::new(state_builder.build(db_pool))
             }
         };
 
@@ -155,6 +173,7 @@ impl Default for AppBuilder {
             state: None,
             state_builder: AppStateBuilder::default(),
             auto_migrate: true,
+            redis: None,
         }
     }
 }
