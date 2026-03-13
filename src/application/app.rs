@@ -8,7 +8,6 @@ use crate::{api::server, application::config::Config};
 
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
 use redis::aio::MultiplexedConnection;
-use tokio::sync::Mutex;
 use tokio_postgres::NoTls;
 
 pub struct App {
@@ -119,8 +118,8 @@ impl AppBuilder {
                     None => Self::create_db_pool(&config)?,
                 };
                 let redis = match self.redis {
-                    Some(conn) => Mutex::new(conn),
-                    None => Mutex::new(Self::create_redis_connection(&config).await?),
+                    Some(conn) => conn,
+                    None => Self::create_redis_connection(&config).await?,
                 };
 
                 Arc::new(self.state_builder.build(db_pool, redis))
@@ -175,7 +174,7 @@ impl Default for AppBuilder {
             state: None,
             state_builder: AppStateBuilder::default(),
             auto_migrate: true,
-            redis: None
+            redis: None,
         }
     }
 }

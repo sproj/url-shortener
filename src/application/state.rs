@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use deadpool_postgres::Pool;
 use redis::aio::MultiplexedConnection;
-use tokio::sync::Mutex;
 
 use crate::application::{
     repository::short_url_repository::ShortUrlRepository,
     service::short_url::{
         code_generator::{CodeGenerator, RandomCodeGenerator},
+        redirect_cache::RedirectCacheChecker,
         short_url_service::ShortUrlService,
     },
 };
@@ -34,13 +34,15 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn build(self, db_pool: Pool, redis: Mutex<MultiplexedConnection>) -> AppState {
+    pub fn build(self, db_pool: Pool, redis: MultiplexedConnection) -> AppState {
         let short_url_repository = ShortUrlRepository::new(db_pool.clone());
+        let redirect_cache = RedirectCacheChecker::new(redis);
+
         let short_url_service = Arc::new(ShortUrlService::new(
             short_url_repository,
             self.code_generator,
             self.max_retries,
-            redis,
+            redirect_cache,
         ));
 
         AppState {

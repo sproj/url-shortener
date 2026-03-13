@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
 
-use crate::application::repository::database_error::DatabaseError;
+use crate::infrastructure::database::database_error::DatabaseError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortUrl {

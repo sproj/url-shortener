@@ -13,5 +13,5 @@ pub enum StartupError {
     #[error("server startup error")]
     Server(String),
     #[error("redis startup error")]
-    RedisConnection(String)
+    RedisConnection(String),
 }

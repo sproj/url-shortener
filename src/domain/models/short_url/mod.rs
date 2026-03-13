@@ -1,3 +1,3 @@
-mod entity;
+mod short_url;
 
-pub use entity::ShortUrl;
+pub use short_url::ShortUrl;

@@ -1,16 +1,19 @@
 use std::sync::Arc;
 
-use redis::{AsyncCommands, aio::MultiplexedConnection};
-use tokio::sync::Mutex;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     api::handlers::short_url::ValidatedCreateShortUrlRequest,
     application::{
         ShortUrlError,
-        repository::{database_error::DatabaseError, short_url_repository::ShortUrlRepository},
-        service::short_url::{ShortUrlSpec, code_generator::CodeGenerator},
+        repository::short_url_repository::ShortUrlRepository,
+        service::short_url::{
+            ShortUrlSpec, code_generator::CodeGenerator, redirect_cache::RedirectCacheChecker,
+            redirect_cache_trait::RedirectCache,
+        },
     },
     domain::models::short_url::ShortUrl,
+    infrastructure::database::database_error::DatabaseError,
 };
 
 const SHORT_URL_CODE_KEY_CONSTRAINT_NAME: &str = "short_url_code_key";
@@ -19,9 +22,10 @@ pub struct ShortUrlService {
     code_generator: Arc<dyn CodeGenerator>,
     max_retries: u8,
     repository: Arc<ShortUrlRepository>,
-    redis: Mutex<MultiplexedConnection>,
+    redirect_cache: Arc<dyn RedirectCache>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RedirectDecision {
     Permanent { long_url: String },
     Temporary { long_url: String },
@@ -34,13 +38,13 @@ impl ShortUrlService {
         repository: ShortUrlRepository,
         code_generator: Arc<dyn CodeGenerator>,
         max_retries: u8,
-        redis: Mutex<MultiplexedConnection>,
+        redirect_cache: RedirectCacheChecker,
     ) -> Self {
         ShortUrlService {
             code_generator,
             max_retries,
             repository: Arc::new(repository),
-            redis,
+            redirect_cache: Arc::new(redirect_cache),
         }
     }
 
@@ -48,9 +52,11 @@ impl ShortUrlService {
         self.repository.get_all().await
     }
 
-    pub async fn get_by_id(&self, id: i64) -> Result<Option<ShortUrl>, DatabaseError> {
-        let cache_hit = self.redis.lock().await.get(id).await?;
-        self.repository.get_by_id(id).await
+    pub async fn get_by_id(&self, id: i64) -> Result<Option<ShortUrl>, ShortUrlError> {
+        self.repository
+            .get_by_id(id)
+            .await
+            .map_err(ShortUrlError::Storage)
     }
 
     pub async fn get_by_code(&self, code: &str) -> Result<Option<ShortUrl>, DatabaseError> {
@@ -117,7 +123,14 @@ impl ShortUrlService {
     pub async fn resolve_redirect_decision(
         &self,
         code: &str,
-    ) -> Result<RedirectDecision, DatabaseError> {
+    ) -> Result<RedirectDecision, ShortUrlError> {
+        let cache_result = self.redirect_cache.get(code).await;
+        if let Ok(Some(cache_hit)) = cache_result {
+            tracing::info!(%code, "cache hit");
+            return Ok(cache_hit);
+        }
+
+        tracing::info!(%code, "cache miss - checking db");
         let record = self.get_by_code(code).await?;
         match record {
             None => Ok(RedirectDecision::NotFound),
