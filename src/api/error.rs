@@ -11,10 +11,12 @@ use crate::infrastructure::database::database_error::DatabaseError;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ApiErrorKind {
     ResourceNotFound,
     UnprocessableInput,
     ValidationError,
+    #[default]
     Internal,
 }
 
@@ -33,11 +35,6 @@ impl Display for ApiErrorKind {
     }
 }
 
-impl Default for ApiErrorKind {
-    fn default() -> Self {
-        Self::Internal
-    }
-}
 
 impl ApiErrorKind {
     pub fn status_code(self) -> StatusCode {
