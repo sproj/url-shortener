@@ -23,10 +23,6 @@ impl App {
         AppBuilder::default()
     }
 
-    pub async fn run() -> Result<(), StartupError> {
-        Self::builder().build().await?.start().await
-    }
-
     pub fn config(&self) -> &Config {
         &self.config
     }
@@ -47,7 +43,9 @@ impl App {
             tracing::info!(?report, "Migrations applied");
         }
 
-        Self::run_server(self.config, self.state).await
+        tracing::info!("Starting server");
+        server::start(self.config, self.state).await
+
     }
 
     async fn run_migrations(state: &SharedState) -> Result<refinery::Report, StartupError> {
@@ -58,11 +56,6 @@ impl App {
             .run_async(client)
             .await
             .map_err(StartupError::DbMigrations)
-    }
-
-    async fn run_server(config: Config, state: SharedState) -> Result<(), StartupError> {
-        tracing::info!("Starting server");
-        server::start(config, state).await
     }
 }
 

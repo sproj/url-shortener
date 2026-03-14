@@ -5,12 +5,17 @@ use crate::application::startup_error::StartupError;
 #[derive(Clone, Debug)]
 pub struct Config {
     // Rest API configuration
-    pub service_host: String,
-    pub service_port: u16,
+    pub app: AppConfig,
     // PostgreSQL configuration
     pub db: DbConfig,
     // Redis configuration.
     pub redis: RedisConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct AppConfig {
+    pub service_host: String,
+    pub service_port: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -32,8 +37,11 @@ pub struct RedisConfig {
 impl Config {
     pub fn service_socket_address(&self) -> Result<SocketAddr, StartupError> {
         use std::str::FromStr;
-        SocketAddr::from_str(&format!("{}:{}", self.service_host, self.service_port))
-            .map_err(|e| StartupError::Server(e.to_string()))
+        SocketAddr::from_str(&format!(
+            "{}:{}",
+            self.app.service_host, self.app.service_port
+        ))
+        .map_err(|e| StartupError::Server(e.to_string()))
     }
 
     pub fn redis_url(&self) -> String {
@@ -61,8 +69,10 @@ pub fn load() -> Result<Config, StartupError> {
     }
 
     let cfg = Config {
-        service_host: env_get("SERVICE_HOST")?,
-        service_port: env_parse("SERVICE_PORT")?,
+        app: AppConfig {
+            service_host: env_get("SERVICE_HOST")?,
+            service_port: env_parse("SERVICE_PORT")?,
+        },
         db: DbConfig {
             postgres_user: env_get("POSTGRES_USER")?,
             postgres_password: env_get("POSTGRES_PASSWORD")?,

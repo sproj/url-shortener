@@ -116,7 +116,7 @@ impl TestAppBuilder {
         config.db.postgres_password = db.password.clone();
 
         // .env.test should include this, but force the issue to avoid accidental fixed-port tests.
-        config.service_port = 0;
+        config.app.service_port = 0;
         config
     }
 }
