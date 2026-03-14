@@ -109,11 +109,11 @@ impl TestAppBuilder {
     }
     async fn default_test_config_for_db(db: &SharedTestDb) -> Config {
         let mut config = url_shortener::application::config::load().unwrap();
-        config.db.postgres_host = db.host.clone();
-        config.db.postgres_port = db.port;
-        config.db.postgres_db = db.db_name.clone();
-        config.db.postgres_user = db.user.clone();
-        config.db.postgres_password = db.password.clone();
+        config.db.postgres_host = db.config.postgres_host.clone();
+        config.db.postgres_port = db.config.postgres_port.clone();
+        config.db.postgres_db = db.config.postgres_db.clone();
+        config.db.postgres_user = db.config.postgres_user.clone();
+        config.db.postgres_password = db.config.postgres_password.clone();
 
         // .env.test should include this, but force the issue to avoid accidental fixed-port tests.
         config.app.service_port = 0;

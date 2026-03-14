@@ -2,35 +2,38 @@ use std::mem::ManuallyDrop;
 use std::sync::{Arc, Mutex, Weak};
 use testcontainers::{ContainerAsync, Image};
 
-pub struct SharedContainer<I: Image, C: Send> {
+pub struct SharedContainer<I: Image, C: Send + Clone + Sync> {
     pub config: C,
     container_id: String,
     _container: ManuallyDrop<testcontainers::ContainerAsync<I>>,
     _rt: ManuallyDrop<tokio::runtime::Runtime>,
 }
 
-impl<I: Image, C: Send> Drop for SharedContainer<I, C> {
+impl<I: Image, C: Send + Clone + Sync> Drop for SharedContainer<I, C> {
     fn drop(&mut self) {
-        std::process::Command::new("docker")
-            .args(["rm", "fv", &self.container_id])
-            .output()
-            .ok();
+        let drop_result = std::process::Command::new("docker")
+            .args(["rm", "-fv", &self.container_id])
+            .output();
+
+        if let Err(e) = drop_result {
+            eprintln!("Failed to remove container {}: {}", self.container_id, e)
+        }
     }
 }
 
-pub type ContainerBootstrapOutput<I: Image> = (u16, String, ContainerAsync<I>);
-pub type ContainerBootstrap<I: Image> = fn(image: I) -> ContainerBootstrapOutput<I>;
+pub type ContainerBootstrapOutput<I: Image, C: Send + Clone + Sync> =
+    (String, ContainerAsync<I>, C);
+pub type ContainerBootstrap<I: Image, C: Send + Clone + Sync> =
+    fn(image: I) -> ContainerBootstrapOutput<I, C>;
 
-pub async fn get_or_create<I: Image, C, F, Fut>(
+pub async fn get_or_create_shared_container<I: Image, C: Send + Clone + Sync, F, Fut>(
     storage: &'static Mutex<Weak<SharedContainer<I, C>>>,
-    container_config: C,
     start_container: F,
 ) -> Arc<SharedContainer<I, C>>
 where
     I: Image,
-    C: Send + Sync,
     F: FnOnce() -> Fut + Send + 'static,
-    Fut: Future<Output = ContainerBootstrapOutput<I>> + Send,
+    Fut: Future<Output = ContainerBootstrapOutput<I, C>> + Send,
 {
     {
         let weak = storage.lock().unwrap();
@@ -48,10 +51,10 @@ where
             .unwrap();
 
         let start_container_future = start_container();
-        let (port, container_id, container) = rt.block_on(start_container_future);
+        let (container_id, container, config) = rt.block_on(start_container_future);
 
         let arc = Arc::new(SharedContainer {
-            config: container_config,
+            config: config.clone(),
             _container: ManuallyDrop::new(container),
             _rt: ManuallyDrop::new(rt),
             container_id,

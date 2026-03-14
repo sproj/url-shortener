@@ -65,7 +65,7 @@ async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
 
     let sut = test_app::TestApp::builder()
         .with_state_builder(state_builder)
-        .with_auto_migrate(true)
+        // .with_auto_migrate(true)
         .build()
         .await;
 

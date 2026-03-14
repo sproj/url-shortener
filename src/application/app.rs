@@ -45,7 +45,6 @@ impl App {
 
         tracing::info!("Starting server");
         server::start(self.config, self.state).await
-
     }
 
     async fn run_migrations(state: &SharedState) -> Result<refinery::Report, StartupError> {
