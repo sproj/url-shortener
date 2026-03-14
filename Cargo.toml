@@ -32,4 +32,4 @@ async-trait = "0.1.89"
 [dev-dependencies]
 reqwest = { version = "0.13.1", features = ["json"] }
 testcontainers = { version = "0.27.1", features = ["docker-compose"] }
-testcontainers-modules = { version = "0.15.0", features = ["postgres"] }
+testcontainers-modules = { version = "0.15.0", features = ["postgres", "redis"] }
