@@ -1,4 +1,5 @@
 use core::net::SocketAddr;
+use redis::aio::MultiplexedConnection;
 use reqwest::StatusCode;
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,7 +15,8 @@ use url_shortener::{
 
 use crate::common::{
     constants,
-    test_db::{self, SharedTestDb},
+    test_db::SharedTestDb,
+    test_redis::SharedTestRedis,
 };
 
 pub struct TestApp {
@@ -40,6 +42,7 @@ pub struct TestAppBuilder {
     db: Option<Arc<SharedTestDb>>,
     state_builder: AppStateBuilder,
     auto_migrate: bool,
+    redis: Option<Arc<SharedTestRedis>>,
 }
 
 impl TestAppBuilder {
@@ -63,6 +66,11 @@ impl TestAppBuilder {
         self
     }
 
+    pub fn with_redis(mut self, conn: Arc<SharedTestRedis>) -> Self {
+        self.redis = Some(conn);
+        self
+    }
+
     pub async fn build(self) -> TestApp {
         let db = match self.db {
             Some(db) => db,
@@ -74,9 +82,15 @@ impl TestAppBuilder {
             None => Self::default_test_config_for_db(db.as_ref()).await,
         };
 
+        let redis_connection = match self.redis {
+            Some(conn) => conn,
+            None => test_redis::get_or_create().await,
+        };
+
         let app = App::builder()
             .with_config(config.clone())
             .with_state_builder(self.state_builder)
+            .with_redis(redis_connection)
             .with_auto_migrate(false)
             .build()
             .await
@@ -128,6 +142,7 @@ impl Default for TestAppBuilder {
             db: None,
             state_builder: AppStateBuilder::default(),
             auto_migrate: false,
+            redis: None,
         }
     }
 }
