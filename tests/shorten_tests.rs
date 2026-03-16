@@ -8,6 +8,7 @@ use url_shortener::{
     },
     domain::models::short_url::ShortUrl,
 };
+use uuid::Uuid;
 
 pub mod common;
 
@@ -51,7 +52,7 @@ async fn get_after_create_shorturl_succeeds() {
     assert_eq!(create.status(), StatusCode::CREATED);
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
 
-    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.id).as_str());
+    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str());
 
     let read = client.get(get_by_id_url).send().await.unwrap();
 
@@ -84,7 +85,7 @@ async fn get_all_succeeds() {
 
     assert_eq!(create.status(), StatusCode::CREATED);
 
-    let expected_id = create.json::<CreateShortUrlResponse>().await.unwrap().id;
+    let expected_uuid = create.json::<CreateShortUrlResponse>().await.unwrap().uuid;
 
     let read_all = client.get(create_url).send().await.unwrap();
 
@@ -92,7 +93,7 @@ async fn get_all_succeeds() {
 
     let actual = read_all.json::<Vec<ShortUrl>>().await.unwrap();
 
-    assert!(actual.iter().any(|el| el.id == expected_id));
+    assert!(actual.iter().any(|el| el.uuid == expected_uuid));
 }
 
 #[tokio::test]
@@ -314,14 +315,14 @@ async fn delete_shorturl_by_id_succeeds() {
 
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
     let url_with_id_path_param =
-        sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.id).as_str());
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str());
 
     let delete = client.delete(url_with_id_path_param).send().await.unwrap();
 
     assert_eq!(delete.status(), StatusCode::OK);
 
     let delete_response = delete.json::<String>().await.unwrap();
-    assert_eq!(delete_response, created.id.to_string());
+    assert_eq!(delete_response, created.uuid.to_string());
 }
 
 #[tokio::test]
@@ -329,7 +330,7 @@ async fn get_shorturl_by_nosuch_id_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let no_such_id = -1;
+    let no_such_id = Uuid::nil();
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
 
     let res = client.get(url).send().await.unwrap();
@@ -345,7 +346,7 @@ async fn delete_shorturl_by_nosuch_id_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let no_such_id = -1;
+    let no_such_id = Uuid::nil();
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
 
     let res = client.delete(url).send().await.unwrap();

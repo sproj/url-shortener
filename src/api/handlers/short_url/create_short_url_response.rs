@@ -8,7 +8,6 @@ use crate::domain::models::short_url::ShortUrl;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateShortUrlResponse {
-    pub id: i64,
     pub uuid: Uuid,
     pub code: String,
     pub long_url: String,
@@ -18,7 +17,6 @@ pub struct CreateShortUrlResponse {
 impl From<ShortUrl> for CreateShortUrlResponse {
     fn from(value: ShortUrl) -> Self {
         Self {
-            id: value.id,
             uuid: value.uuid,
             code: value.code,
             long_url: value.long_url,
