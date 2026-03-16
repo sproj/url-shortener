@@ -13,10 +13,7 @@ pub mod common;
 
 #[tokio::test]
 async fn create_shorturl_from_input_succeeds() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
 
     let url = sut.build_path(API_PATH_SHORTEN);
 
@@ -38,10 +35,7 @@ async fn create_shorturl_from_input_succeeds() {
 
 #[tokio::test]
 async fn get_after_create_shorturl_succeeds() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
 
     let create_url = sut.build_path(API_PATH_SHORTEN);
     let client = reqwest::Client::new();
@@ -70,10 +64,7 @@ async fn get_after_create_shorturl_succeeds() {
 
 #[tokio::test]
 async fn get_all_succeeds() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
 
     let create_url = sut.build_path(API_PATH_SHORTEN);
 
@@ -106,10 +97,7 @@ async fn get_all_succeeds() {
 
 #[tokio::test]
 async fn mal_formed_json_payload_returns_expected_error() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -134,10 +122,7 @@ async fn mal_formed_json_payload_returns_expected_error() {
 
 #[tokio::test]
 async fn well_formed_json_but_invalid_create_request_returns_expected_error() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -162,10 +147,7 @@ async fn well_formed_json_but_invalid_create_request_returns_expected_error() {
 
 #[tokio::test]
 async fn empty_long_url_returns_correct_error() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -188,10 +170,7 @@ async fn empty_long_url_returns_correct_error() {
 
 #[tokio::test]
 async fn excessively_long_url_returns_correct_error() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -216,10 +195,7 @@ async fn excessively_long_url_returns_correct_error() {
 
 #[tokio::test]
 async fn expires_at_in_the_past_returns_correct_error() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -246,10 +222,7 @@ async fn expires_at_in_the_past_returns_correct_error() {
 
 #[tokio::test]
 async fn scheme_must_be_http_or_https() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -274,10 +247,7 @@ async fn scheme_must_be_http_or_https() {
 
 #[tokio::test]
 async fn input_url_must_have_host() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -302,10 +272,7 @@ async fn input_url_must_have_host() {
 
 #[tokio::test]
 async fn input_url_cannot_contain_password() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let url = sut.build_path(API_PATH_SHORTEN);
@@ -330,10 +297,7 @@ async fn input_url_cannot_contain_password() {
 
 #[tokio::test]
 async fn delete_shorturl_by_id_succeeds() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let create_url = sut.build_path(API_PATH_SHORTEN);
@@ -362,10 +326,7 @@ async fn delete_shorturl_by_id_succeeds() {
 
 #[tokio::test]
 async fn get_shorturl_by_nosuch_id_returns_404() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let no_such_id = -1;
@@ -381,10 +342,7 @@ async fn get_shorturl_by_nosuch_id_returns_404() {
 
 #[tokio::test]
 async fn delete_shorturl_by_nosuch_id_returns_404() {
-    let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
-        .build()
-        .await;
+    let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let no_such_id = -1;

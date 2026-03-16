@@ -1,9 +1,10 @@
 use redis::aio::MultiplexedConnection;
 
-use crate::application::{config::Config, startup_error::StartupError};
+use crate::application::{config::RedisConfig, startup_error::StartupError};
 
-pub async fn connect(config: &Config) -> Result<MultiplexedConnection, StartupError> {
-    match redis::Client::open(config.redis_url()) {
+pub async fn connect(config: &RedisConfig) -> Result<MultiplexedConnection, StartupError> {
+    let url = format!("redis://{}:{}", config.redis_host, config.redis_port);
+    match redis::Client::open(url) {
         Ok(client) => match client.get_multiplexed_async_connection().await {
             Ok(connection) => {
                 tracing::info!("Connected to redis");
@@ -18,5 +19,22 @@ pub async fn connect(config: &Config) -> Result<MultiplexedConnection, StartupEr
             tracing::error!(%e, "Could not open redis");
             Err(StartupError::RedisConnection(e.to_string()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn connect_returns_startup_error_when_unreachable() {
+        let redis_config = RedisConfig {
+            redis_host: "127.0.0.1".to_string(),
+            redis_port: 1,
+        };
+
+        let result = connect(&redis_config).await;
+
+        assert!(matches!(result, Err(StartupError::RedisConnection(_))));
     }
 }

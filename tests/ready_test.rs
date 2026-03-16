@@ -16,11 +16,10 @@ async fn ready_succeeds_on_db_connectable() {
 
 #[tokio::test]
 async fn ready_fails_on_no_database() {
-    let db = test_db::get_or_create().await;
-
     let mut cfg = url_shortener::application::config::load().unwrap();
     cfg.db.postgres_port = 1;
-    cfg.service_port = 0;
+    cfg.app.service_port = 0;
+    let db = test_db::get_or_create().await;
 
     let sut = test_app::TestApp::builder()
         .with_db(db)
@@ -36,15 +35,15 @@ async fn ready_fails_on_no_database() {
 
 #[tokio::test]
 async fn ready_fails_on_invalid_db_config() {
+    let mut cfg = url_shortener::application::config::load().unwrap();
     let db = test_db::get_or_create().await;
 
-    let mut cfg = url_shortener::application::config::load().unwrap();
-    cfg.db.postgres_host = db.host.clone();
-    cfg.db.postgres_port = db.port;
-    cfg.db.postgres_db = db.db_name.clone();
-    cfg.db.postgres_user = db.user.clone();
+    // cfg.db.postgres_host = db.postgres_host.clone();
+    // cfg.db.postgres_port = db.postgres_port;
+    // cfg.db.postgres_db = db.postgres_db.clone();
+    // cfg.db.postgres_user = db.postgres_user.clone();
     cfg.db.postgres_password = "invalid".into();
-    cfg.service_port = 0;
+    cfg.app.service_port = 0;
 
     let sut = test_app::TestApp::builder()
         .with_db(db)

@@ -1,51 +1,89 @@
-# URL Shortener - Current Notes - 10 March 2026
+# URL Shortener - Current Notes - 16 March 2026
 
 ## Current snapshot
 
 Completed and working:
 
-- App startup is now builder-based (`App::builder().build().await?.start().await`).
-- `App`/`AppBuilder` own config loading, DB pool creation, migration, and server start flow (no free startup functions).
-- `TestApp` is now builder-based and composable (`TestApp::builder()` with config/db/state-builder/migration toggles).
-- Startup/config panic cleanup is in progress and mostly done:
-  - config env reads/parse now return `StartupError::Config`.
-  - server listen/start now return `Result<_, StartupError>`.
-- Logging switched from `println!/eprintln!/dbg!` to `tracing` across the app path.
-- Short URL create/list/get/delete flows are in place and integration-tested.
-- Redirect flow is implemented and integration-tested:
-  - `/r/{code}` returns:
-  - `301` for GET + permanent code (no expiry),
-  - `308` for non-GET + permanent code,
-  - `302` for GET + temporary code (future expiry),
-  - `307` for non-GET + temporary code,
-  - `404` when code missing,
-  - `410` when expired or deleted.
-- Retry-on-code-conflict behavior is implemented and covered by integration tests (success + exhausted retries).
+- `App` and `TestApp` are both builder-driven and much less tangled than before.
+- App startup is now composed around injected infra:
+  - config load,
+  - Postgres pool creation,
+  - optional Redis connection,
+  - app/service wiring,
+  - server start.
+- Shared test infra is in place for both Postgres and Redis:
+  - `tests/common/shared_container.rs`
+  - `tests/common/test_db.rs`
+  - `tests/common/test_redis.rs`
+- `ShortUrlService` now supports:
+  - create with retry-on-code-conflict,
+  - list/get/delete,
+  - redirect decision resolution,
+  - redirect cache read-through,
+  - cache invalidation on delete.
+- Redis-backed redirect cache is implemented:
+  - `RedirectCache` trait
+  - `RedirectCacheChecker`
+  - `NoopRedirectCache`
+- Tracing replaced most ad hoc logging (`println!`, `dbg!`, `eprintln!`) in app code.
+- Startup/runtime error handling has improved:
+  - env parsing now returns `StartupError::Config`
+  - server listen/start paths return `Result`
+  - fewer panic paths in non-test code.
 
-## Current test status
+## Existing integration coverage
 
-- Integration suites present:
-  - `health_test`
-  - `ready_test`
-  - `shorten_tests`
-  - `retry_on_conflict_test`
-  - `redirect_tests`
-  - `error_tests`
-- Redirect matrix and collision/retry matrix are both green.
+Green suites already present:
 
-## Next feature focus (tomorrow)
+- `health_test`
+- `ready_test`
+- `shorten_tests`
+- `retry_on_conflict_test`
+- `redirect_tests`
+- `error_tests`
 
-1. Add Redis cache for redirect lookups (`code -> redirect decision/long_url`).
-2. Define cache policy before coding:
-   - key shape and serialization format,
-   - TTL strategy for temporary links,
-   - invalidation strategy for delete/update/expiry transitions.
-3. Keep DB as source of truth; cache should be read-through/write-through (or read-through + explicit invalidation).
-4. Add integration coverage for cache-hit/cache-miss behavior and stale-entry safety.
+Covered behavior includes:
+
+- readiness success/failure
+- create/list/get/delete short URLs
+- input validation/error responses
+- redirect matrix (`301/302/307/308/404/410`)
+- retry success and retry exhaustion on code conflict
+
+## Immediate next work
+
+1. Add integration tests for Redis cache behavior.
+2. Cover both paths explicitly:
+   - cache hit for redirect lookup
+   - cache invalidation after delete
+3. Keep tests end-to-end:
+   - use real Redis container via `TestAppBuilder`
+   - avoid unit-only cache tests for the first pass
+
+## Suggested cache test cases
+
+1. `resolve_redirect_decision` caches a permanent redirect:
+   - create short URL
+   - hit `/r/{code}` once to populate cache
+   - remove the row from Postgres manually
+   - hit `/r/{code}` again
+   - expect redirect still succeeds from cache
+
+2. deleting a cached code invalidates Redis:
+   - create short URL
+   - hit `/r/{code}` once to populate cache
+   - delete via API
+   - hit `/r/{code}` again
+   - expect `404` or `410` according to current delete semantics, but not cached redirect
+
+3. cache miss still falls back to DB when Redis is enabled:
+   - create short URL
+   - first redirect should succeed without pre-seeded cache
+   - useful mainly as a smoke test for Redis wiring
 
 ## Near-term cleanup
 
-1. Remove DB `id` from API responses and converge on `uuid` as public identifier.
-2. Replace remaining RPC-style `/shorten/getByCode/{code}` with final REST shape (after redirect/cache settles).
+1. Remove DB `id` from API responses and make `uuid` the public identifier.
+2. Replace RPC-style `GET /shorten/getByCode/{code}` with the final API shape.
 3. Continue removing remaining `unwrap`/panic paths in non-test code.
-4. Add tracing spans/request IDs once Redis is introduced.
+4. Add more focused startup/config failure tests now that startup returns `Result` more consistently.
