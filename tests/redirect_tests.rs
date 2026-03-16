@@ -2,12 +2,14 @@ pub mod common;
 
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
+use redis::AsyncTypedCommands;
 use url_shortener::api::handlers::short_url::CreateShortUrlResponse;
+use url_shortener::infrastructure::redis::connect;
 use uuid::Uuid;
 
 use crate::common::{
     constants::{API_PATH_REDIRECT, API_PATH_SHORTEN},
-    test_app,
+    test_app, test_redis,
 };
 
 #[tokio::test]
@@ -156,6 +158,66 @@ async fn deleted_code_returns_410() {
     assert_eq!(actual.status(), StatusCode::GONE);
 }
 
+#[tokio::test]
+async fn redirect_uses_cached_decision_when_db_row_is_gone() {
+    let redis = test_redis::get_or_create().await;
+    let sut = test_app::TestApp::builder()
+        .with_redis(redis.clone())
+        .build()
+        .await;
+    let client = no_redirect_client();
+
+    let short = create_short_url(&client, &sut, "http://cached-redirect.me", None).await;
+    let redirect_url = sut.build_path(format!("{}/{}", API_PATH_REDIRECT, &short.code).as_str());
+
+    let first = client.get(redirect_url.clone()).send().await.unwrap();
+    assert_eq!(first.status(), StatusCode::MOVED_PERMANENTLY);
+
+    let db = sut.state.db_pool.get().await.unwrap();
+    db.execute("DELETE FROM short_url WHERE code = $1", &[&short.code])
+        .await
+        .unwrap();
+
+    let second = client.get(redirect_url).send().await.unwrap();
+    assert_eq!(second.status(), StatusCode::MOVED_PERMANENTLY);
+    assert_eq!(
+        second.headers().get(reqwest::header::LOCATION).unwrap(),
+        "http://cached-redirect.me"
+    );
+}
+
+#[tokio::test]
+async fn deleting_short_url_invalidates_cached_redirect() {
+    let redis = test_redis::get_or_create().await;
+    let sut = test_app::TestApp::builder()
+        .with_redis(redis.clone())
+        .build()
+        .await;
+    let client = no_redirect_client();
+
+    let short = create_short_url(&client, &sut, "http://delete-invalidates-cache.me", None).await;
+    let redirect_url = sut.build_path(format!("{}/{}", API_PATH_REDIRECT, &short.code).as_str());
+
+    let first = client.get(redirect_url.clone()).send().await.unwrap();
+    assert_eq!(first.status(), StatusCode::MOVED_PERMANENTLY);
+
+    let cached_before = redis_get(&redis, &short.code).await;
+    assert!(cached_before.is_some());
+
+    let delete = client
+        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, short.id).as_str()))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(delete.status(), StatusCode::OK);
+
+    let cached_after = redis_get(&redis, &short.code).await;
+    assert!(cached_after.is_none());
+
+    let second = client.get(redirect_url).send().await.unwrap();
+    assert_eq!(second.status(), StatusCode::GONE);
+}
+
 fn no_redirect_client() -> reqwest::Client {
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -201,4 +263,9 @@ async fn seed_short_url_record(
         )
         .await
         .unwrap();
+}
+
+async fn redis_get(redis: &test_redis::SharedTestRedis, code: &str) -> Option<String> {
+    let mut conn = connect::connect(&redis.config).await.unwrap();
+    conn.get(code).await.unwrap()
 }
