@@ -2,6 +2,7 @@ use std::{ops::Sub, sync::Arc};
 
 use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
     api::handlers::short_url::ValidatedCreateShortUrlRequest,
@@ -52,9 +53,9 @@ impl ShortUrlService {
         self.repository.get_all().await
     }
 
-    pub async fn get_by_id(&self, id: i64) -> Result<Option<ShortUrl>, ShortUrlError> {
+    pub async fn get_by_uuid(&self, uuid: Uuid) -> Result<Option<ShortUrl>, ShortUrlError> {
         self.repository
-            .get_by_id(id)
+            .get_by_uuid(uuid)
             .await
             .map_err(ShortUrlError::Storage)
     }
@@ -63,17 +64,17 @@ impl ShortUrlService {
         self.repository.get_by_code(code).await
     }
 
-    pub async fn delete_one_by_id(&self, id: i64) -> Result<bool, ShortUrlError> {
-        let rec = match self.repository.get_by_id(id).await {
+    pub async fn delete_one_by_uuid(&self, uuid: Uuid) -> Result<bool, ShortUrlError> {
+        let rec = match self.repository.get_by_uuid(uuid).await {
             Ok(Some(short)) => short,
-            Ok(None) => return Err(ShortUrlError::NotFound(id.to_string())),
+            Ok(None) => return Err(ShortUrlError::NotFound(uuid.to_string())),
             Err(e) => return Err(ShortUrlError::from(e)),
         };
 
         let deleted_code = rec.code;
 
-        tracing::info!(%id, "soft deleting ShortUrl with id");
-        let delete_result = self.repository.delete_one_by_id(id).await?;
+        tracing::info!(%uuid, "soft deleting ShortUrl with uuid");
+        let delete_result = self.repository.delete_one_by_uuid(uuid).await?;
 
         tracing::info!(%deleted_code, "removing code from cache");
         match self.redirect_cache.delete(&deleted_code).await {

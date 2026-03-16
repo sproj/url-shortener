@@ -205,7 +205,7 @@ async fn deleting_short_url_invalidates_cached_redirect() {
     assert!(cached_before.is_some());
 
     let delete = client
-        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, short.id).as_str()))
+        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, short.uuid).as_str()))
         .send()
         .await
         .unwrap();

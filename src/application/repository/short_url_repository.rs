@@ -5,6 +5,7 @@ use crate::{
 use chrono::Utc;
 use deadpool_postgres::{GenericClient, Pool};
 use tokio_postgres::types::{ToSql, Type};
+use uuid::Uuid;
 
 pub struct ShortUrlRepository {
     pool: Pool,
@@ -25,12 +26,12 @@ impl ShortUrlRepository {
             .collect::<Result<Vec<_>, _>>()
     }
 
-    pub async fn get_by_id(&self, id: i64) -> RepositoryResult<Option<ShortUrl>> {
-        tracing::debug!(%id, "get by id");
+    pub async fn get_by_uuid(&self, uuid: Uuid) -> RepositoryResult<Option<ShortUrl>> {
+        tracing::debug!(%uuid, "get by uuid");
         self.pool
         .get()
         .await?
-        .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE id = $1", &[&id])
+        .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE uuid = $1", &[&uuid])
         .await?
         .map(ShortUrl::try_from)
         .transpose()
@@ -67,16 +68,16 @@ impl ShortUrlRepository {
         inserted_long_url_row.try_into()
     }
 
-    pub async fn delete_one_by_id(&self, id: i64) -> RepositoryResult<bool> {
-        tracing::debug!(%id, "delete by id");
+    pub async fn delete_one_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
+        tracing::debug!(%uuid, "delete by uuid");
         let client = self.pool.get().await?;
 
         let delete_statement = client
-            .prepare("UPDATE short_url SET deleted_at = $1 WHERE id = $2")
+            .prepare("UPDATE short_url SET deleted_at = $1 WHERE uuid = $2")
             .await?;
 
         let deleted_count = client
-            .execute(&delete_statement, &[&Utc::now(), &id])
+            .execute(&delete_statement, &[&Utc::now(), &uuid])
             .await?;
 
         tracing::debug!(%deleted_count);

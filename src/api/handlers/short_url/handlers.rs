@@ -3,6 +3,7 @@ use axum::{
     extract::{Path, State, rejection::JsonRejection},
     http::StatusCode,
 };
+use uuid::Uuid;
 
 use crate::{
     api::{
@@ -22,17 +23,17 @@ pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortU
     Ok(Json(short_urls))
 }
 
-pub async fn get_one_by_id(
+pub async fn get_one_by_uuid(
     State(state): State<SharedState>,
-    Path(id): Path<i64>,
+    Path(uuid): Path<Uuid>,
 ) -> Result<Json<ShortUrl>, ApiError> {
-    tracing::debug!(%id, "get one by id");
-    if let Some(short) = state.short_url.get_by_id(id).await? {
+    tracing::debug!(%uuid, "get one by uuid");
+    if let Some(short) = state.short_url.get_by_uuid(uuid).await? {
         tracing::debug!(?short, "ok");
         Ok(Json(short))
     } else {
-        tracing::warn!(%id, "not found");
-        Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))
+        tracing::warn!(%uuid, "not found");
+        Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
     }
 }
 
@@ -71,15 +72,15 @@ pub async fn add_one(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
-pub async fn delete_one_by_id(
+pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
-    Path(id): Path<i64>,
+    Path(uuid): Path<Uuid>,
 ) -> Result<Json<String>, ApiError> {
-    if state.short_url.delete_one_by_id(id).await? {
-        tracing::debug!(%id, "ok");
-        Ok(Json(id.to_string()))
+    if state.short_url.delete_one_by_uuid(uuid).await? {
+        tracing::debug!(%uuid, "ok");
+        Ok(Json(uuid.to_string()))
     } else {
-        tracing::warn!(%id, "not found");
-        Err(ApiError::from(ShortUrlError::NotFound(id.to_string())))
+        tracing::warn!(%uuid, "not found");
+        Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
     }
 }
