@@ -88,3 +88,39 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::config::{AppConfig, Config, DbConfig, RedisConfig};
+    use std::net::TcpListener as StdTcpListener;
+
+    #[tokio::test]
+    async fn listen_returns_server_error_for_address_in_use() {
+        let occupied = StdTcpListener::bind("127.0.0.1:0").unwrap();
+        let port = occupied.local_addr().unwrap().port();
+
+        let config = Config {
+            app: AppConfig {
+                service_host: "127.0.0.1".to_string(),
+                service_port: port,
+            },
+            db: DbConfig {
+                postgres_user: "admin".to_string(),
+                postgres_password: "password".to_string(),
+                postgres_host: "127.0.0.1".to_string(),
+                postgres_port: 5432,
+                postgres_db: "url_shortener".to_string(),
+                postgres_connection_pool: 5,
+            },
+            redis: RedisConfig {
+                redis_host: "127.0.0.1".to_string(),
+                redis_port: 6379,
+            },
+        };
+
+        let result = listen(config).await;
+
+        assert!(matches!(result, Err(StartupError::Server(_))));
+    }
+}

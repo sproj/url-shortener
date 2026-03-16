@@ -55,3 +55,25 @@ impl Database {
         Ok(report)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn migrate_returns_pool_access_error_when_db_unreachable() {
+        let db_config = DbConfig {
+            postgres_user: "admin".to_string(),
+            postgres_password: "password".to_string(),
+            postgres_host: "127.0.0.1".to_string(),
+            postgres_port: 1,
+            postgres_db: "missing".to_string(),
+            postgres_connection_pool: 1,
+        };
+
+        let pool = Database::connect(&db_config).unwrap();
+        let result = Database::migrate(&pool).await;
+
+        assert!(matches!(result, Err(StartupError::DbPoolAccess(_))));
+    }
+}

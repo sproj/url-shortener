@@ -21,3 +21,20 @@ pub async fn connect(config: &RedisConfig) -> Result<MultiplexedConnection, Star
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn connect_returns_startup_error_when_unreachable() {
+        let redis_config = RedisConfig {
+            redis_host: "127.0.0.1".to_string(),
+            redis_port: 1,
+        };
+
+        let result = connect(&redis_config).await;
+
+        assert!(matches!(result, Err(StartupError::RedisConnection(_))));
+    }
+}

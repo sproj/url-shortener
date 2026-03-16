@@ -116,3 +116,115 @@ where
         .parse::<T>()
         .map_err(|e| StartupError::Config(format!("Failed to parse {} : {}", key, e)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn load_fails_when_required_env_var_is_empty_for_numeric_field() {
+        let _guard = lock_env();
+        let _env_test = EnvVarGuard::set("ENV_TEST", Some("1"));
+        let _invalid = EnvVarGuard::set("POSTGRES_PORT", Some(""));
+
+        let result = load();
+
+        assert!(
+            matches!(result, Err(StartupError::Config(msg)) if msg.contains("Failed to parse POSTGRES_PORT"))
+        );
+    }
+
+    #[test]
+    fn load_fails_when_env_var_cannot_be_parsed() {
+        let _guard = lock_env();
+        let _env_test = EnvVarGuard::set("ENV_TEST", Some("1"));
+        let _invalid = EnvVarGuard::set("SERVICE_PORT", Some("not-a-number"));
+
+        let result = load();
+
+        assert!(
+            matches!(result, Err(StartupError::Config(msg)) if msg.contains("Failed to parse SERVICE_PORT"))
+        );
+    }
+
+    #[test]
+    fn service_socket_address_returns_error_for_invalid_host() {
+        let config = config_fixture();
+        let invalid = Config {
+            app: AppConfig {
+                service_host: "bad host name with spaces".to_string(),
+                service_port: config.app.service_port,
+            },
+            ..config
+        };
+
+        let result = invalid.service_socket_address();
+
+        assert!(matches!(result, Err(StartupError::Server(_))));
+    }
+
+    fn config_fixture() -> Config {
+        Config {
+            app: AppConfig {
+                service_host: "127.0.0.1".to_string(),
+                service_port: 0,
+            },
+            db: DbConfig {
+                postgres_user: "admin".to_string(),
+                postgres_password: "password".to_string(),
+                postgres_host: "127.0.0.1".to_string(),
+                postgres_port: 5432,
+                postgres_db: "url_shortener".to_string(),
+                postgres_connection_pool: 5,
+            },
+            redis: RedisConfig {
+                redis_host: "127.0.0.1".to_string(),
+                redis_port: 6379,
+            },
+        }
+    }
+
+    fn lock_env() -> MutexGuard<'static, ()> {
+        match ENV_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    struct EnvVarGuard {
+        key: String,
+        original: Option<String>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &str, value: Option<&str>) -> Self {
+            let original = std::env::var(key).ok();
+
+            unsafe {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+
+            Self {
+                key: key.to_string(),
+                original,
+            }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            unsafe {
+                match &self.original {
+                    Some(value) => std::env::set_var(&self.key, value),
+                    None => std::env::remove_var(&self.key),
+                }
+            }
+        }
+    }
+}
