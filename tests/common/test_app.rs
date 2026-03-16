@@ -84,8 +84,11 @@ impl TestAppBuilder {
             None => config_from_db(&db),
         };
 
+        // Always migrate against the real container — config may be deliberately broken in error tests
+        let migration_pool = Database::connect(&db.config).unwrap();
+        Database::migrate(&migration_pool).await.unwrap();
+
         let pool = Database::connect(&config.db).unwrap();
-        Database::migrate(&pool).await.unwrap();
 
         let mut app_builder = App::builder(config.clone(), pool);
 
