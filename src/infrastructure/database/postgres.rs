@@ -41,7 +41,7 @@ impl Database {
 
     pub async fn migrate(db_pool: &Pool) -> Result<refinery::Report, StartupError> {
         tracing::info!("Running migrations");
-        
+
         let mut conn = db_pool.get().await?;
         let client = conn.deref_mut().deref_mut();
 

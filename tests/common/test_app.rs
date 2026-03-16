@@ -6,12 +6,10 @@ use tokio::time::Instant;
 use url_shortener::{
     api::server,
     application::{
-        app::App,
-        config::Config,
-        service::short_url::code_generator::CodeGenerator,
+        app::App, config::Config, service::short_url::code_generator::CodeGenerator,
         state::SharedState,
     },
-    infrastructure::{database::database::Database, redis::connect},
+    infrastructure::{database::postgres::Database, redis::connect},
 };
 
 use crate::common::{

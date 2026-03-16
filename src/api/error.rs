@@ -35,7 +35,6 @@ impl Display for ApiErrorKind {
     }
 }
 
-
 impl ApiErrorKind {
     pub fn status_code(self) -> StatusCode {
         match self {
