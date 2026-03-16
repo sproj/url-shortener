@@ -1,5 +1,4 @@
 use core::net::SocketAddr;
-use redis::aio::MultiplexedConnection;
 use reqwest::StatusCode;
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,13 +8,15 @@ use url_shortener::{
     application::{
         app::App,
         config::Config,
-        state::{AppStateBuilder, SharedState},
+        service::short_url::code_generator::CodeGenerator,
+        state::SharedState,
     },
+    infrastructure::{database::database::Database, redis::connect},
 };
 
 use crate::common::{
     constants,
-    test_db::SharedTestDb,
+    test_db::{self, SharedTestDb},
     test_redis::SharedTestRedis,
 };
 
@@ -23,6 +24,7 @@ pub struct TestApp {
     pub state: SharedState,
     socket_address: SocketAddr,
     _db: Arc<SharedTestDb>,
+    _redis: Option<Arc<SharedTestRedis>>,
 }
 
 impl TestApp {
@@ -40,9 +42,9 @@ impl TestApp {
 pub struct TestAppBuilder {
     config: Option<Config>,
     db: Option<Arc<SharedTestDb>>,
-    state_builder: AppStateBuilder,
-    auto_migrate: bool,
     redis: Option<Arc<SharedTestRedis>>,
+    code_generator: Option<Arc<dyn CodeGenerator>>,
+    max_retries: Option<u8>,
 }
 
 impl TestAppBuilder {
@@ -56,18 +58,18 @@ impl TestAppBuilder {
         self
     }
 
-    pub fn with_state_builder(mut self, state_builder: AppStateBuilder) -> Self {
-        self.state_builder = state_builder;
+    pub fn with_redis(mut self, redis: Arc<SharedTestRedis>) -> Self {
+        self.redis = Some(redis);
         self
     }
 
-    pub fn with_auto_migrate(mut self, auto_migrate: bool) -> Self {
-        self.auto_migrate = auto_migrate;
+    pub fn with_code_generator(mut self, code_generator: Arc<dyn CodeGenerator>) -> Self {
+        self.code_generator = Some(code_generator);
         self
     }
 
-    pub fn with_redis(mut self, conn: Arc<SharedTestRedis>) -> Self {
-        self.redis = Some(conn);
+    pub fn with_max_retries(mut self, max_retries: u8) -> Self {
+        self.max_retries = Some(max_retries);
         self
     }
 
@@ -79,29 +81,28 @@ impl TestAppBuilder {
 
         let config = match self.config {
             Some(config) => config,
-            None => Self::default_test_config_for_db(db.as_ref()).await,
+            None => config_from_db(&db),
         };
 
-        let redis_connection = match self.redis {
-            Some(conn) => conn,
-            None => test_redis::get_or_create().await,
-        };
+        let pool = Database::connect(&config.db).unwrap();
+        Database::migrate(&pool).await.unwrap();
 
-        let app = App::builder()
-            .with_config(config.clone())
-            .with_state_builder(self.state_builder)
-            .with_redis(redis_connection)
-            .with_auto_migrate(false)
-            .build()
-            .await
-            .unwrap();
+        let mut app_builder = App::builder(config.clone(), pool);
 
-        let app = if self.auto_migrate {
-            app.migrate().await.unwrap()
-        } else {
-            app
-        };
+        if let Some(code_generator) = self.code_generator {
+            app_builder = app_builder.with_code_generator(code_generator);
+        }
 
+        if let Some(max_retries) = self.max_retries {
+            app_builder = app_builder.with_max_retries(max_retries);
+        }
+
+        if let Some(redis) = &self.redis {
+            let conn = connect::connect(&redis.config).await.unwrap();
+            app_builder = app_builder.with_redis(conn);
+        }
+
+        let app = app_builder.build().await.unwrap();
         let state = app.state().clone();
 
         let listener = server::listen(config).await.unwrap();
@@ -113,6 +114,7 @@ impl TestAppBuilder {
         let sut = TestApp {
             socket_address: addr,
             _db: db,
+            _redis: self.redis,
             state,
         };
 
@@ -121,18 +123,13 @@ impl TestAppBuilder {
 
         sut
     }
-    async fn default_test_config_for_db(db: &SharedTestDb) -> Config {
-        let mut config = url_shortener::application::config::load().unwrap();
-        config.db.postgres_host = db.config.postgres_host.clone();
-        config.db.postgres_port = db.config.postgres_port.clone();
-        config.db.postgres_db = db.config.postgres_db.clone();
-        config.db.postgres_user = db.config.postgres_user.clone();
-        config.db.postgres_password = db.config.postgres_password.clone();
+}
 
-        // .env.test should include this, but force the issue to avoid accidental fixed-port tests.
-        config.app.service_port = 0;
-        config
-    }
+fn config_from_db(db: &SharedTestDb) -> Config {
+    let mut config = url_shortener::application::config::load().unwrap();
+    config.db = db.config.clone();
+    config.app.service_port = 0;
+    config
 }
 
 impl Default for TestAppBuilder {
@@ -140,9 +137,9 @@ impl Default for TestAppBuilder {
         Self {
             config: None,
             db: None,
-            state_builder: AppStateBuilder::default(),
-            auto_migrate: false,
             redis: None,
+            code_generator: None,
+            max_retries: None,
         }
     }
 }

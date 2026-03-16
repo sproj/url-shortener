@@ -6,7 +6,7 @@ use url_shortener::{
         error::{ApiError, ApiErrorKind},
         handlers::short_url::CreateShortUrlResponse,
     },
-    application::{service::short_url::code_generator::FixedCodeGenerator, state::AppStateBuilder},
+    application::service::short_url::code_generator::FixedCodeGenerator,
 };
 use uuid::Uuid;
 
@@ -16,16 +16,12 @@ pub mod common;
 
 #[tokio::test]
 async fn add_one_retries_on_code_conflict_then_succeeds() {
-    let state_builder = AppStateBuilder::default()
+    let sut = test_app::TestApp::builder()
         .with_code_generator(Arc::new(FixedCodeGenerator::new(vec![
             "conflict-code".to_string(),
             "recovered-code".to_string(),
         ])))
-        .with_max_retries(5);
-
-    let sut = test_app::TestApp::builder()
-        .with_state_builder(state_builder)
-        .with_auto_migrate(true)
+        .with_max_retries(5)
         .build()
         .await;
 
@@ -48,7 +44,7 @@ async fn add_one_retries_on_code_conflict_then_succeeds() {
 
 #[tokio::test]
 async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
-    let state_builder = AppStateBuilder::default()
+    let sut = test_app::TestApp::builder()
         .with_code_generator(Arc::new(FixedCodeGenerator::new(
             vec![
                 "always-collides",
@@ -61,11 +57,7 @@ async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
             .map(str::to_owned)
             .collect(),
         )))
-        .with_max_retries(5);
-
-    let sut = test_app::TestApp::builder()
-        .with_state_builder(state_builder)
-        .with_auto_migrate(true)
+        .with_max_retries(5)
         .build()
         .await;
 

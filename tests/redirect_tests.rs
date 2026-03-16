@@ -13,7 +13,6 @@ use crate::common::{
 #[tokio::test]
 async fn permanent_get_redirect_succeeds() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();
@@ -47,7 +46,6 @@ async fn permanent_get_redirect_succeeds() {
 #[tokio::test]
 async fn permanent_non_get_redirect_succeeds() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();
@@ -67,7 +65,6 @@ async fn permanent_non_get_redirect_succeeds() {
 #[tokio::test]
 async fn temporary_get_redirect_succeeds() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();
@@ -88,7 +85,6 @@ async fn temporary_get_redirect_succeeds() {
 #[tokio::test]
 async fn temporary_non_get_redirect_succeeds() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();
@@ -109,7 +105,6 @@ async fn temporary_non_get_redirect_succeeds() {
 #[tokio::test]
 async fn missing_code_returns_404() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();
@@ -126,7 +121,6 @@ async fn missing_code_returns_404() {
 #[tokio::test]
 async fn expired_code_returns_410() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();
@@ -153,7 +147,6 @@ async fn expired_code_returns_410() {
 #[tokio::test]
 async fn deleted_code_returns_410() {
     let sut = test_app::TestApp::builder()
-        .with_auto_migrate(true)
         .build()
         .await;
     let client = no_redirect_client();

@@ -24,6 +24,10 @@ pub struct AppStateBuilder {
 }
 
 impl AppStateBuilder {
+    pub fn builder() -> Self {
+        Self::default()
+    }
+    
     pub fn with_code_generator(mut self, code_generator: Arc<dyn CodeGenerator>) -> Self {
         self.code_generator = code_generator;
         self
