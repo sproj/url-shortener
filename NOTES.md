@@ -1,89 +1,83 @@
-# URL Shortener - Current Notes - 16 March 2026
+# URL Shortener - Current Notes - 17 March 2026
 
 ## Current snapshot
 
 Completed and working:
 
-- `App` and `TestApp` are both builder-driven and much less tangled than before.
-- App startup is now composed around injected infra:
-  - config load,
-  - Postgres pool creation,
-  - optional Redis connection,
-  - app/service wiring,
-  - server start.
-- Shared test infra is in place for both Postgres and Redis:
-  - `tests/common/shared_container.rs`
-  - `tests/common/test_db.rs`
-  - `tests/common/test_redis.rs`
-- `ShortUrlService` now supports:
-  - create with retry-on-code-conflict,
-  - list/get/delete,
-  - redirect decision resolution,
-  - redirect cache read-through,
-  - cache invalidation on delete.
-- Redis-backed redirect cache is implemented:
-  - `RedirectCache` trait
-  - `RedirectCacheChecker`
-  - `NoopRedirectCache`
-- Tracing replaced most ad hoc logging (`println!`, `dbg!`, `eprintln!`) in app code.
-- Startup/runtime error handling has improved:
-  - env parsing now returns `StartupError::Config`
-  - server listen/start paths return `Result`
-  - fewer panic paths in non-test code.
+- Public API now uses `uuid` instead of database `id`.
+- `GET /shorten/getByCode/{code}` has been removed.
+- Short URL HTTP surface currently includes:
+  - `POST /shorten`
+  - `GET /shorten`
+  - `GET /shorten/{uuid}`
+  - `DELETE /shorten/{uuid}`
+  - `GET|POST|... /r/{code}`
+- Redirect behavior is implemented and covered:
+  - `301` / `308` for permanent redirects
+  - `302` / `307` for temporary redirects
+  - `404` for missing code
+  - `410` for deleted or expired code
+- Redis-backed redirect caching is in place:
+  - read-through on redirect lookup
+  - cache invalidation on delete
+  - cache-disabled fallback via `NoopRedirectCache`
+- Retry-on-code-conflict behavior remains implemented and tested.
+- App/test startup has been untangled substantially:
+  - shared Postgres and Redis test containers
+  - composable `TestAppBuilder`
+  - app wiring takes real or test collaborators cleanly
+- Unit and integration coverage were improved:
+  - redirect/cache integration tests added
+  - startup/config/database/redis failure paths now have focused unit tests
+- Logging now uses `tracing` instead of ad hoc prints in app code.
 
-## Existing integration coverage
+## Current test picture
 
-Green suites already present:
+Green suites present:
 
 - `health_test`
 - `ready_test`
 - `shorten_tests`
-- `retry_on_conflict_test`
 - `redirect_tests`
+- `retry_on_conflict_test`
 - `error_tests`
 
-Covered behavior includes:
+Coverage is in a healthy place for the current stage:
 
-- readiness success/failure
-- create/list/get/delete short URLs
-- input validation/error responses
-- redirect matrix (`301/302/307/308/404/410`)
-- retry success and retry exhaustion on code conflict
+- total line coverage is roughly `75%`
+- service/repository/cache/redirect paths are better covered than startup/error formatting paths
 
-## Immediate next work
+## Next focus: deployment
 
-1. Add integration tests for Redis cache behavior.
-2. Cover both paths explicitly:
-   - cache hit for redirect lookup
-   - cache invalidation after delete
-3. Keep tests end-to-end:
-   - use real Redis container via `TestAppBuilder`
-   - avoid unit-only cache tests for the first pass
+Primary goal for today:
 
-## Suggested cache test cases
+1. Deploy locally to Minikube.
 
-1. `resolve_redirect_decision` caches a permanent redirect:
-   - create short URL
-   - hit `/r/{code}` once to populate cache
-   - remove the row from Postgres manually
-   - hit `/r/{code}` again
-   - expect redirect still succeeds from cache
+Likely deployment steps:
 
-2. deleting a cached code invalidates Redis:
-   - create short URL
-   - hit `/r/{code}` once to populate cache
-   - delete via API
-   - hit `/r/{code}` again
-   - expect `404` or `410` according to current delete semantics, but not cached redirect
+1. Add container image build path for the app.
+2. Add Kubernetes manifests for:
+   - app deployment
+   - app service
+   - Postgres
+   - Redis
+   - config/secret handling
+3. Decide how migrations should run in Kubernetes:
+   - app startup
+   - init container
+   - one-shot job
+4. Verify the deployed app can:
+   - start cleanly
+   - reach Postgres and Redis
+   - serve `/health` and `/ready`
+   - create and redirect a short URL end to end
 
-3. cache miss still falls back to DB when Redis is enabled:
-   - create short URL
-   - first redirect should succeed without pre-seeded cache
-   - useful mainly as a smoke test for Redis wiring
+## Near-term follow-up
 
-## Near-term cleanup
-
-1. Remove DB `id` from API responses and make `uuid` the public identifier.
-2. Replace RPC-style `GET /shorten/getByCode/{code}` with the final API shape.
-3. Continue removing remaining `unwrap`/panic paths in non-test code.
-4. Add more focused startup/config failure tests now that startup returns `Result` more consistently.
+1. Revisit the final REST shape for non-redirect lookup by `code` if needed.
+2. Improve coverage in lower-value but still weak files:
+   - `api/error.rs`
+   - `application/app.rs`
+   - `application/config.rs`
+   - `application/state.rs`
+3. Add deployment-oriented tracing/logging polish once the app is running in-cluster.
