@@ -11,6 +11,7 @@ use axum::{
 };
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
+use tower_http::normalize_path::NormalizePathLayer;
 
 pub async fn start(config: Config, state: SharedState) -> Result<(), StartupError> {
     let listener = listen(config).await?;
@@ -32,6 +33,7 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .nest("/shorten", short_url_routes::routes())
         .nest("/r", redirect_routes::routes())
         .fallback(error_404_handler)
+        .layer(NormalizePathLayer::trim_trailing_slash())
         .with_state(state);
 
     axum::serve(listener, router)
