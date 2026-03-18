@@ -61,11 +61,9 @@ pub fn load() -> Result<Config, StartupError> {
 
     // Try to load environment variables from file.
     if dotenvy::from_filename(env_file).is_ok() {
-        tracing::info!(%env_file, "config found");
+        tracing::info!(%env_file, "config loaded from file");
     } else {
-        let config_not_found = format!("{} file not found", env_file);
-        tracing::error!(%env_file, "config file not found");
-        return Err(StartupError::Config(config_not_found));
+        tracing::info!(%env_file, "config file not found, reading from environment");
     }
 
     let cfg = Config {
