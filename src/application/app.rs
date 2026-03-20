@@ -5,6 +5,7 @@ use crate::application::service::short_url::code_generator::{CodeGenerator, Rand
 use crate::application::service::short_url::redirect_cache::RedirectCacheChecker;
 use crate::application::service::short_url::redirect_cache_trait::NoopRedirectCache;
 use crate::application::service::short_url::short_url_service::ShortUrlService;
+use crate::application::service::user::user_service::UsersService;
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppState, SharedState};
 use crate::{api::server, application::config::Config};
@@ -98,6 +99,7 @@ impl AppBuilder {
                     None => Arc::new(NoopRedirectCache),
                 },
             )),
+            users: Arc::new(UsersService::new(self.db_pool.clone())),
             db_pool: self.db_pool,
         });
         Ok(App {

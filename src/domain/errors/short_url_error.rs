@@ -47,7 +47,7 @@ impl From<&ShortUrlError> for ApiError {
                     .detail(json!({ "not_found": id_or_code }))
             }
             ShortUrlError::UnprocessableInput(msg) => {
-                tracing::warn!(%short_url_error, "unprocessable user input");
+                tracing::warn!(%short_url_error, "unprocessable short_url input");
                 ApiError::new("unprocessable_input")
                     .kind(ApiErrorKind::UnprocessableInput)
                     .detail(json!({"invalid_input_url": [{

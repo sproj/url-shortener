@@ -1,12 +1,11 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tokio_postgres::Row;
 use uuid::Uuid;
 
 use crate::infrastructure::database::database_error::DatabaseError;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: i64,
     pub uuid: Uuid,
@@ -17,7 +16,7 @@ pub struct User {
     pub active: bool,
     pub roles: String,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
 }
 

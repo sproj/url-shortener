@@ -6,9 +6,10 @@ use uuid::Uuid;
 use crate::{
     application::{repository::RepositoryResult, service::user::user_spec::UserSpec},
     domain::models::user::User,
+    infrastructure::database::database_error::DatabaseError,
 };
 
-pub struct UserRepository {
+pub struct UsersRepository {
     pool: Pool,
 }
 
@@ -36,22 +37,32 @@ email,
 password_hash,
 password_salt,
 active,
-roles,
-deleted_at
+roles
 ) 
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-RETURNING id, uuid, username, email, active, roles";
+VALUES ($1, $2, $3, $4, $5, $6, $7) 
+RETURNING id, uuid, username, password_hash, password_salt, email, active, roles, created_at, updated_at, deleted_at";
 
 const DELETE_USER_BY_UUID: &str = "UPDATE users SET deleted_at = $1 WHERE uuid = $2";
 
 const UPDATE_PASS_BY_USERID: &str =
     "UPDATE users SET password_hash = $1, password_salt = $2 WHERE uuid = $3";
 
-impl UserRepository {
+const WITHOUT_SOFT_DELETED: &str = "\n WHERE deleted_at IS NULL";
+
+impl UsersRepository {
+    pub fn new(pool: Pool) -> Self {
+        Self { pool }
+    }
+
     pub async fn get_all(&self) -> RepositoryResult<Vec<User>> {
         let client = self.pool.get().await?;
 
-        let rows = client.query(SELECT_USER_ROW, &[]).await?;
+        let rows = client
+            .query(
+                format!("{}\n{}", SELECT_USER_ROW, WITHOUT_SOFT_DELETED).as_str(),
+                &[],
+            )
+            .await?;
 
         rows.into_iter()
             .map(User::try_from)
@@ -64,7 +75,7 @@ impl UserRepository {
             .get()
             .await?
             .query_opt(
-                format!("{} {}", SELECT_USER_ROW, "WHERE uuid = $1").as_str(),
+                format!("{}\n{}", SELECT_USER_ROW, "WHERE uuid = $1").as_str(),
                 &[&uuid],
             )
             .await?
@@ -101,12 +112,16 @@ impl UserRepository {
             &spec.roles,
         ];
 
-        let inserted = client.query_one(&insert_user, params).await?;
-
-        inserted.try_into()
+        match client.query_one(&insert_user, params).await {
+            Ok(inserted) => inserted.try_into(),
+            Err(e) => {
+                tracing::error!(%e, "database error on user insert");
+                Err(DatabaseError::from(e))
+            }
+        }
     }
 
-    pub async fn delete_user_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
+    pub async fn soft_delete_user_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
         tracing::debug!(%uuid, "delete user by uuid");
         let client = self.pool.get().await?;
 
@@ -118,11 +133,7 @@ impl UserRepository {
 
         tracing::debug!(%delete_user_result, %uuid);
 
-        if delete_user_result == 0 {
-            Ok(false)
-        } else {
-            Ok(true)
-        }
+        Ok(delete_user_result != 0)
     }
 
     pub async fn update_password_by_uuid(
@@ -140,12 +151,8 @@ impl UserRepository {
             .execute(&update_pass_statement, &[&hash, &salt, &uuid])
             .await?;
 
-        tracing::debug!(%update_pass_result, %uuid, %hash);
+        tracing::debug!(%update_pass_result, %uuid);
 
-        if update_pass_result == 0 {
-            Ok(false)
-        } else {
-            Ok(true)
-        }
+        Ok(update_pass_result != 0)
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    api::routes::{redirect_routes, short_url_routes},
+    api::routes::{redirect_routes, short_url_routes, users_routes},
     application::{config::Config, startup_error::StartupError, state::SharedState},
 };
 use axum::{
@@ -31,6 +31,7 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
         .nest("/shorten", short_url_routes::routes())
+        .nest("/users", users_routes::routes())
         .nest("/r", redirect_routes::routes())
         .fallback(error_404_handler)
         .layer(NormalizePathLayer::trim_trailing_slash())

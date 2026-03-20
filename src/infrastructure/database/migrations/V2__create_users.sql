@@ -15,7 +15,7 @@ CREATE TABLE users (
 -- index on non-deleted users
 CREATE INDEX idx_users_email_active ON users(email) WHERE deleted_at IS NULL;
 
--- populate users table
+--populate users table
 INSERT INTO users (
         uuid,
         username,
@@ -29,15 +29,14 @@ INSERT INTO users (
         deleted_at
     )
 VALUES (
-        '0ca4906b-15f5-4365-841d-07e5eb431ef1',
+        '019d0b7f-77c4-7fd2-acc2-d78789845da3',
         'admin',
         'admin@admin.com',
-        -- pswd1234, sha256(pwd + salt) as hex lower-case
-        'cf432b08ee63230b6831e2c86456e4a60beb65fa21b363c7a0e497fd29021597', -- 
-        -- 32 u32 to utf8, range 32..126 (first 32 chars are unprintable) as char -> 96^32 possible salts 
-        'g7YqA&^8Mz4tD3!sP*1r^0KcJ6f$mQh',
+        -- pass1234, argon2id(pwd + salt)
+        '$argon2id$v=19$m=19456,t=2,p=1$k3CGJ1BlOvUvJ6zGULarIQ$RLchvry0DuLIkBbhxt9vADBQq4WkXNNEgY02Awk/lrs',
+        'k3CGJ1BlOvUvJ6zGULarIQ',
         'true',
-        'admin',
+        'user,admin',
         now(),
         now(),
         NULL

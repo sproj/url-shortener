@@ -1,7 +1,10 @@
 use argon2::password_hash::Error as HashError;
 use thiserror::Error;
 
-use crate::infrastructure::database::database_error::DatabaseError;
+use crate::{
+    domain::validation_issue::ValidationIssue,
+    infrastructure::database::database_error::DatabaseError,
+};
 
 #[derive(Debug, Error)]
 pub enum UserError {
@@ -9,10 +12,16 @@ pub enum UserError {
     HashingError(HashError),
     #[error("user repository error: {0}")]
     Storage(DatabaseError),
+    #[error("invalid user input: {0:?}")]
+    InvalidInput(Vec<ValidationIssue>),
+    #[error("unprocessable input: {0}")]
+    UnprocessableInput(String),
+    #[error("user not found: {0}")]
+    NotFound(String),
 }
 
-// impl Display for UserError {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "user error")
-//     }
-// }
+impl From<DatabaseError> for UserError {
+    fn from(err: DatabaseError) -> Self {
+        Self::Storage(err)
+    }
+}
