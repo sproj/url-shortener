@@ -13,7 +13,8 @@ use crate::{
             create_short_url_response::CreateShortUrlResponse,
         },
     },
-    application::{ShortUrlError, state::SharedState},
+    application::state::SharedState,
+    domain::errors::ShortUrlError,
     domain::models::short_url::ShortUrl,
 };
 

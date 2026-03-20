@@ -6,9 +6,8 @@ use axum::{
 
 use crate::{
     api::error::ApiError,
-    application::{
-        ShortUrlError, service::short_url::short_url_service::RedirectDecision, state::SharedState,
-    },
+    application::{service::short_url::short_url_service::RedirectDecision, state::SharedState},
+    domain::errors::ShortUrlError,
 };
 
 pub async fn redirect(

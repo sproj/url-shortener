@@ -7,12 +7,12 @@ use uuid::Uuid;
 use crate::{
     api::handlers::short_url::ValidatedCreateShortUrlRequest,
     application::{
-        ShortUrlError,
         repository::short_url_repository::ShortUrlRepository,
         service::short_url::{
             ShortUrlSpec, code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
         },
     },
+    domain::errors::ShortUrlError,
     domain::models::short_url::ShortUrl,
     infrastructure::database::database_error::DatabaseError,
 };
