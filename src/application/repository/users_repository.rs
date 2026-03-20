@@ -75,7 +75,11 @@ impl UsersRepository {
             .get()
             .await?
             .query_opt(
-                format!("{}\n{}", SELECT_USER_ROW, "WHERE uuid = $1").as_str(),
+                format!(
+                    "{}\n{}\n{}",
+                    SELECT_USER_ROW, WITHOUT_SOFT_DELETED, "AND uuid = $1 ",
+                )
+                .as_str(),
                 &[&uuid],
             )
             .await?
