@@ -47,7 +47,7 @@ impl ShortUrlRepository {
     }
 
     pub async fn add_one(&self, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
-        tracing::debug!(%spec, "insert spec");
+        tracing::debug!(%spec, "insert short_url spec");
 
         let client = self.pool.get().await?;
 
@@ -69,7 +69,7 @@ impl ShortUrlRepository {
     }
 
     pub async fn delete_one_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
-        tracing::debug!(%uuid, "delete by uuid");
+        tracing::debug!(%uuid, "delete short_url by uuid");
         let client = self.pool.get().await?;
 
         let delete_statement = client

@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     api::handlers::short_url::ValidatedCreateShortUrlRequest,
-    application::ShortUrlError,
+    domain::errors::ShortUrlError,
     domain::validation_issue::{ValidationIssue, ValidationRule},
 };
 

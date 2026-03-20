@@ -5,9 +5,12 @@ use axum::{
 };
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::fmt::{Display, Formatter, Result};
 
-use crate::infrastructure::database::database_error::DatabaseError;
+use crate::{
+    domain::errors::user_error::UserError, infrastructure::database::database_error::DatabaseError,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +96,43 @@ impl From<DatabaseError> for ApiError {
             message: "database operation failed".to_string(),
             kind: ApiErrorKind::Internal,
             detail: None,
+        }
+    }
+}
+
+impl From<UserError> for ApiError {
+    fn from(err: UserError) -> Self {
+        let user_error_message = &err.to_string();
+
+        match err {
+            UserError::HashingError(e) => {
+                tracing::error!(%user_error_message, %e, "failed to hash incoming password");
+                ApiError::new("failed to create password hash").kind(ApiErrorKind::Internal)
+            }
+            UserError::InvalidInput(issues) => {
+                tracing::error!(%user_error_message, "invalid create_user input");
+                ApiError::new(user_error_message)
+                    .kind(ApiErrorKind::ValidationError)
+                    .detail(json!({"invalid_user_input": issues }))
+            }
+            UserError::Storage(e) => {
+                tracing::error!(%e, "unexpected database error on user entity");
+                ApiError::new("internal database error").kind(ApiErrorKind::Internal)
+            }
+            UserError::UnprocessableInput(msg) => {
+                tracing::warn!("unprocessable input on user handler");
+                ApiError::new("unprocessable input")
+                    .kind(ApiErrorKind::UnprocessableInput)
+                    .detail(json!({"invalid_user_input": [{
+                        "field": "request_body",
+                        "code": "parse_failure",
+                        "message": msg
+                    }]}))
+            }
+            UserError::NotFound(id) => {
+                tracing::warn!(%id, "user not found");
+                ApiError::new(user_error_message).kind(ApiErrorKind::ResourceNotFound)
+            }
         }
     }
 }
