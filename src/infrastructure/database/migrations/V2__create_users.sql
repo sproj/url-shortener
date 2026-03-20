@@ -1,6 +1,6 @@
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
-    uuid UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
+    uuid UUID UNIQUE NOT NULL,
     username TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -17,6 +17,7 @@ CREATE INDEX idx_users_email_active ON users(email) WHERE deleted_at IS NULL;
 
 -- populate users table
 INSERT INTO users (
+        uuid,
         username,
         email,
         password_hash,
@@ -28,6 +29,7 @@ INSERT INTO users (
         deleted_at
     )
 VALUES (
+        '0ca4906b-15f5-4365-841d-07e5eb431ef1',
         'admin',
         'admin@admin.com',
         -- pswd1234, sha256(pwd + salt) as hex lower-case
