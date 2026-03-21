@@ -1,5 +1,8 @@
 use crate::{
-    api::routes::{redirect_routes, short_url_routes, users_routes},
+    api::{
+        handlers::auth::auth_handlers::login,
+        routes::{redirect_routes, short_url_routes, users_routes},
+    },
     application::{config::Config, startup_error::StartupError, state::SharedState},
 };
 use axum::{
@@ -7,7 +10,7 @@ use axum::{
     extract::{Request, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
 };
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
@@ -28,6 +31,7 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
 
 pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
     let router = Router::new()
+        .route("/login", post(login))
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
         .nest("/shorten", short_url_routes::routes())

@@ -1,5 +1,5 @@
 use argon2::{
-    Argon2,
+    Argon2, PasswordHash, PasswordVerifier,
     password_hash::{Error as HashError, PasswordHasher, SaltString},
 };
 use deadpool_postgres::Pool;
@@ -11,7 +11,9 @@ use uuid::Uuid;
 use crate::{
     application::{
         repository::users_repository::UsersRepository,
-        service::user::{create_user_params::CreateUserParams, user_spec::UserSpec},
+        service::user::{
+            create_user_params::CreateUserParams, login_params::LoginParams, user_spec::UserSpec,
+        },
     },
     domain::{errors::user_error::UserError, models::user::User},
 };
@@ -69,6 +71,27 @@ impl UsersService {
             .update_password_by_uuid(uuid, &password_hash, salt.as_str())
             .await
             .map_err(UserError::Storage)
+    }
+
+    pub async fn verify_login(&self, params: LoginParams) -> Result<bool, UserError> {
+        let true_hash = match self
+            .repository
+            .get_user_by_username(&params.username)
+            .await?
+        {
+            Some(user) => user.password_hash,
+            None => {
+                tracing::warn!(%params.username, "login attempt user not found");
+                // constant-time dummy work to prevent timing-based enumeration
+                let _ = generate_password_hash(params.password.as_bytes(), &generate_salt());
+                return Ok(false);
+            }
+        };
+
+        let parsed_hash = PasswordHash::new(&true_hash).map_err(UserError::HashingError)?;
+        Ok(Argon2::default()
+            .verify_password(params.password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
 }
 

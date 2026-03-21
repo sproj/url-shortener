@@ -7,6 +7,7 @@ use crate::application::service::{
 };
 
 pub type SharedState = Arc<AppState>;
+
 pub struct AppState {
     pub short_url: Arc<ShortUrlService>,
     pub users: Arc<UsersService>,
