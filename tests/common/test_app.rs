@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use core::net::SocketAddr;
 use reqwest::StatusCode;
 use std::sync::Arc;

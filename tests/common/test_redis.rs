@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::common::shared_container::{SharedContainer, get_or_create_shared_container};
