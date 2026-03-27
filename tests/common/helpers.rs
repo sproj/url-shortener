@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use url_shortener::api::error::ApiError;
 
 pub fn pick_error_fields<'a>(

@@ -87,6 +87,24 @@ impl UsersRepository {
             .transpose()
     }
 
+    pub async fn get_user_by_username(&self, username: &str) -> RepositoryResult<Option<User>> {
+        tracing::debug!(%username, "finding user by username");
+        self.pool
+            .get()
+            .await?
+            .query_opt(
+                format!(
+                    "{} {} {}",
+                    SELECT_USER_ROW, WITHOUT_SOFT_DELETED, "\n AND username = $1"
+                )
+                .as_str(),
+                &[&username],
+            )
+            .await?
+            .map(User::try_from)
+            .transpose()
+    }
+
     pub async fn add_user(&self, spec: UserSpec) -> RepositoryResult<User> {
         tracing::debug!(%spec, "insert user spec");
         let client = self.pool.get().await?;

@@ -1,5 +1,8 @@
 use crate::{
-    api::routes::{redirect_routes, short_url_routes, users_routes},
+    api::{
+        handlers::auth::auth_handlers::login,
+        routes::{redirect_routes, short_url_routes, users_routes},
+    },
     application::{config::Config, startup_error::StartupError, state::SharedState},
 };
 use axum::{
@@ -7,7 +10,7 @@ use axum::{
     extract::{Request, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
 };
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
@@ -28,6 +31,7 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
 
 pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
     let router = Router::new()
+        .route("/login", post(login))
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
         .nest("/shorten", short_url_routes::routes())
@@ -94,8 +98,13 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
+    use jsonwebtoken::{DecodingKey, EncodingKey};
+
     use super::*;
-    use crate::application::config::{AppConfig, Config, DbConfig, RedisConfig};
+    use crate::application::{
+        config::{AppConfig, Config, DbConfig, JwtConfig, RedisConfig},
+        security::jwt::JwtKeys,
+    };
     use std::net::TcpListener as StdTcpListener;
 
     #[tokio::test]
@@ -119,6 +128,17 @@ mod tests {
             redis: RedisConfig {
                 redis_host: "127.0.0.1".to_string(),
                 redis_port: 6379,
+            },
+            jwt: JwtConfig {
+                jwt_enable_revoked_tokens: false,
+                jwt_expire_access_token_seconds: 60,
+                jwt_keys: JwtKeys {
+                    encoding: EncodingKey::from_secret("test_secret".as_bytes()),
+                    decoding: DecodingKey::from_secret("test_secret".as_bytes()),
+                },
+                jwt_expire_refresh_token_seconds: 60,
+                jwt_secret: "test_secret".to_string(),
+                jwt_validation_leeway_seconds: 10,
             },
         };
 

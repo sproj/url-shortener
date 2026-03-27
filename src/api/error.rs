@@ -9,7 +9,8 @@ use serde_json::json;
 use std::fmt::{Display, Formatter, Result};
 
 use crate::{
-    domain::errors::user_error::UserError, infrastructure::database::database_error::DatabaseError,
+    application::security::auth_error::AuthError, domain::errors::user_error::UserError,
+    infrastructure::database::database_error::DatabaseError,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -19,6 +20,8 @@ pub enum ApiErrorKind {
     ResourceNotFound,
     UnprocessableInput,
     ValidationError,
+    Forbidden,
+    Unauthorized,
     #[default]
     Internal,
 }
@@ -33,6 +36,8 @@ impl Display for ApiErrorKind {
                 ApiErrorKind::UnprocessableInput => "unprocessable input",
                 ApiErrorKind::ValidationError => "invalid request or parameters",
                 ApiErrorKind::Internal => "unexpected internal error",
+                ApiErrorKind::Forbidden => "user action not permitted",
+                ApiErrorKind::Unauthorized => "authorization requirement not met",
             }
         )
     }
@@ -45,6 +50,8 @@ impl ApiErrorKind {
             ApiErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
             ApiErrorKind::ValidationError => StatusCode::BAD_REQUEST,
             ApiErrorKind::UnprocessableInput => StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorKind::Forbidden => StatusCode::FORBIDDEN,
+            ApiErrorKind::Unauthorized => StatusCode::UNAUTHORIZED,
         }
     }
 }
@@ -102,12 +109,12 @@ impl From<DatabaseError> for ApiError {
 
 impl From<UserError> for ApiError {
     fn from(err: UserError) -> Self {
-        let user_error_message = &err.to_string();
+        let user_error_message = err.to_string();
 
         match err {
-            UserError::HashingError(e) => {
-                tracing::error!(%user_error_message, %e, "failed to hash incoming password");
-                ApiError::new("failed to create password hash").kind(ApiErrorKind::Internal)
+            UserError::AuthenticationError(e) => {
+                tracing::error!(%user_error_message, %e, "user authentication failed");
+                ApiError::from(e)
             }
             UserError::InvalidInput(issues) => {
                 tracing::error!(%user_error_message, "invalid create_user input");
@@ -132,6 +139,36 @@ impl From<UserError> for ApiError {
             UserError::NotFound(id) => {
                 tracing::warn!(%id, "user not found");
                 ApiError::new(user_error_message).kind(ApiErrorKind::ResourceNotFound)
+            }
+        }
+    }
+}
+
+impl From<AuthError> for ApiError {
+    fn from(err: AuthError) -> Self {
+        let auth_error_message = err.to_string();
+
+        match err {
+            AuthError::Forbidden => ApiError::new(auth_error_message).kind(ApiErrorKind::Forbidden),
+            AuthError::HashingError(_e) => {
+                ApiError::new("hashing operation failed").kind(ApiErrorKind::Internal)
+            }
+            AuthError::IncorrectCredentials => {
+                ApiError::new(auth_error_message).kind(ApiErrorKind::Unauthorized)
+            }
+            AuthError::InvalidToken => {
+                ApiError::new(auth_error_message).kind(ApiErrorKind::UnprocessableInput)
+            }
+            AuthError::MissingCredentials => {
+                ApiError::new(auth_error_message).kind(ApiErrorKind::UnprocessableInput)
+            }
+            AuthError::TokenCreation => {
+                ApiError::new("failed to create token").kind(ApiErrorKind::Internal)
+            }
+            AuthError::ExpiredSignature(reason) => {
+                ApiError::new("received token with expired signature")
+                    .kind(ApiErrorKind::Unauthorized)
+                    .detail(json!({"reason": reason}))
             }
         }
     }
