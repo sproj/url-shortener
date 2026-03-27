@@ -88,8 +88,8 @@ impl UsersService {
                 tracing::warn!(%params.username, "login attempt user not found");
                 // constant-time dummy work to prevent timing-based enumeration
                 let _ = generate_password_hash(params.password.as_bytes(), &generate_salt());
-                return Err(UserError::NotFound(params.username));
+                Err(UserError::NotFound(params.username))
             }
-        };
+        }
     }
 }
