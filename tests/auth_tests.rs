@@ -52,7 +52,7 @@ async fn login_succeeds() {
 
     let body: serde_json::Value = actual.json().await.unwrap();
     let token = body["access_token"].as_str().unwrap();
-    dbg!("token: {}", token);
+
     assert_eq!(token.split('.').count(), 3);
 }
 
