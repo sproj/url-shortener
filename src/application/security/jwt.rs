@@ -97,6 +97,173 @@ impl ClaimsMethods for AccessClaims {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::{
+        application::security::auth::generate_tokens, domain::models::user::User,
+    };
+
+    fn test_keys() -> JwtKeys {
+        JwtKeys::new(b"test-secret-for-unit-tests-only-32b")
+    }
+
+    fn make_test_user() -> User {
+        User {
+            id: 1,
+            uuid: Uuid::now_v7(),
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            password_salt: "salt".to_string(),
+            active: true,
+            roles: "user".to_string(),
+            created_at: Utc::now(),
+            updated_at: None,
+            deleted_at: None,
+        }
+    }
+
+    fn make_claims_with_roles(roles: &str) -> AccessClaims {
+        AccessClaims {
+            sub: "test-sub".to_string(),
+            aud: "url-shortener".to_string(),
+            iss: "url-shortener".to_string(),
+            iat: 0,
+            exp: usize::MAX,
+            jti: "test-jti".to_string(),
+            roles: roles.to_string(),
+        }
+    }
+
+    // --- generate_tokens + decode_token roundtrip ---
+
+    #[test]
+    fn token_sub_matches_user_uuid() {
+        let keys = test_keys();
+        let user = make_test_user();
+        let expected_uuid = user.uuid.to_string();
+
+        let tokens = generate_tokens(user, &keys.encoding, 3600).unwrap();
+        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert_eq!(claims.sub, expected_uuid);
+    }
+
+    #[test]
+    fn token_roles_match_user_roles() {
+        let keys = test_keys();
+        let mut user = make_test_user();
+        user.roles = "admin,user".to_string();
+
+        let tokens = generate_tokens(user, &keys.encoding, 3600).unwrap();
+        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert_eq!(claims.roles, "admin,user");
+    }
+
+    #[test]
+    fn token_exp_is_approximately_now_plus_expiry() {
+        let keys = test_keys();
+        let user = make_test_user();
+        let expiry_seconds = 3600usize;
+        let before = Utc::now().timestamp() as usize;
+
+        let tokens = generate_tokens(user, &keys.encoding, expiry_seconds as i64).unwrap();
+        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        let after = Utc::now().timestamp() as usize;
+        assert!(claims.exp >= before + expiry_seconds);
+        assert!(claims.exp <= after + expiry_seconds);
+    }
+
+    #[test]
+    fn token_aud_and_iss_are_set() {
+        let keys = test_keys();
+        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
+        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert_eq!(claims.aud, "url-shortener");
+        assert_eq!(claims.iss, "url-shortener");
+    }
+
+    #[test]
+    fn token_jti_is_non_empty() {
+        let keys = test_keys();
+        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
+        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert!(!claims.jti.is_empty());
+    }
+
+    // --- decode_token rejection cases ---
+
+    #[test]
+    fn decode_rejects_expired_token() {
+        let keys = test_keys();
+        // exp = now - 120s, leeway = 60s, so this is definitely expired
+        let tokens = generate_tokens(make_test_user(), &keys.encoding, -120).unwrap();
+        let result = decode_token::<AccessClaims>(&tokens.access_token, &keys.decoding);
+
+        assert!(matches!(result, Err(AuthError::ExpiredSignature(_))));
+    }
+
+    #[test]
+    fn decode_rejects_wrong_key() {
+        let keys = test_keys();
+        let other_keys = JwtKeys::new(b"a-completely-different-secret-key");
+
+        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
+        let result = decode_token::<AccessClaims>(&tokens.access_token, &other_keys.decoding);
+
+        assert!(matches!(result, Err(AuthError::InvalidToken)));
+    }
+
+    #[test]
+    fn decode_rejects_tampered_payload() {
+        let keys = test_keys();
+        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
+
+        let parts: Vec<&str> = tokens.access_token.split('.').collect();
+        let tampered = format!("{}.dGFtcGVyZWQ.{}", parts[0], parts[2]);
+
+        let result = decode_token::<AccessClaims>(&tampered, &keys.decoding);
+        assert!(matches!(result, Err(AuthError::InvalidToken)));
+    }
+
+    // --- ClaimsMethods ---
+
+    #[test]
+    fn validate_role_admin_accepts_admin_role() {
+        let claims = make_claims_with_roles("admin");
+        assert!(claims.validate_role_admin().is_ok());
+    }
+
+    #[test]
+    fn validate_role_admin_accepts_admin_in_multi_role() {
+        let claims = make_claims_with_roles("user,admin");
+        assert!(claims.validate_role_admin().is_ok());
+    }
+
+    #[test]
+    fn validate_role_admin_rejects_non_admin() {
+        let claims = make_claims_with_roles("user");
+        assert!(matches!(
+            claims.validate_role_admin(),
+            Err(AuthError::Forbidden)
+        ));
+    }
+
+    #[test]
+    fn validate_role_admin_trims_whitespace() {
+        let claims = make_claims_with_roles("user, admin");
+        assert!(claims.validate_role_admin().is_ok());
+    }
+}
+
 pub fn decode_token<T: for<'de> serde::Deserialize<'de>>(
     token: &str,
     decoding_key: &DecodingKey,
