@@ -49,6 +49,11 @@ async fn login_succeeds() {
         .unwrap();
 
     assert_eq!(actual.status(), StatusCode::OK);
+
+    let body: serde_json::Value = actual.json().await.unwrap();
+    let token = body["access_token"].as_str().unwrap();
+    dbg!("token: {}", token);
+    assert_eq!(token.split('.').count(), 3);
 }
 
 #[tokio::test]

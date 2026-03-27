@@ -1,9 +1,4 @@
-use argon2::{
-    Argon2, PasswordHash, PasswordVerifier,
-    password_hash::{Error as HashError, PasswordHasher, SaltString},
-};
 use deadpool_postgres::Pool;
-use rand_core::OsRng;
 
 use std::sync::Arc;
 use uuid::Uuid;
@@ -11,6 +6,7 @@ use uuid::Uuid;
 use crate::{
     application::{
         repository::users_repository::UsersRepository,
+        security::auth::{compare_password_hashes, generate_password_hash, generate_salt},
         service::user::{
             create_user_params::CreateUserParams, login_params::LoginParams, user_spec::UserSpec,
         },
@@ -63,9 +59,9 @@ impl UsersService {
         new_pass: String,
         uuid: Uuid,
     ) -> Result<bool, UserError> {
-        let salt = SaltString::generate(&mut OsRng);
-        let password_hash =
-            generate_password_hash(new_pass.as_bytes(), &salt).map_err(UserError::HashingError)?;
+        let salt = generate_salt();
+        let password_hash = generate_password_hash(new_pass.as_bytes(), &salt)
+            .map_err(UserError::AuthenticationError)?;
 
         self.repository
             .update_password_by_uuid(uuid, &password_hash, salt.as_str())
@@ -73,35 +69,27 @@ impl UsersService {
             .map_err(UserError::Storage)
     }
 
-    pub async fn verify_login(&self, params: LoginParams) -> Result<bool, UserError> {
-        let true_hash = match self
+    pub async fn verify_login(&self, params: LoginParams) -> Result<User, UserError> {
+        match self
             .repository
             .get_user_by_username(&params.username)
             .await?
         {
-            Some(user) => user.password_hash,
+            Some(user) => {
+                let true_hash = &user.password_hash;
+                match compare_password_hashes(true_hash, params.password)
+                    .map_err(UserError::AuthenticationError)
+                {
+                    Ok(()) => return Ok(user),
+                    Err(e) => return Err(e),
+                }
+            }
             None => {
                 tracing::warn!(%params.username, "login attempt user not found");
                 // constant-time dummy work to prevent timing-based enumeration
                 let _ = generate_password_hash(params.password.as_bytes(), &generate_salt());
-                return Ok(false);
+                return Err(UserError::NotFound(params.username));
             }
         };
-
-        let parsed_hash = PasswordHash::new(&true_hash).map_err(UserError::HashingError)?;
-        Ok(Argon2::default()
-            .verify_password(params.password.as_bytes(), &parsed_hash)
-            .is_ok())
     }
-}
-
-pub(crate) fn generate_salt() -> SaltString {
-    SaltString::generate(&mut OsRng)
-}
-
-pub(crate) fn generate_password_hash(pw: &[u8], salt: &SaltString) -> Result<String, HashError> {
-    let argon2 = Argon2::default();
-
-    let password_hash = argon2.hash_password(pw, salt)?.to_string();
-    Ok(password_hash)
 }

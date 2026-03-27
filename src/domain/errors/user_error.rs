@@ -1,15 +1,14 @@
-use argon2::password_hash::Error as HashError;
 use thiserror::Error;
 
 use crate::{
-    domain::validation_issue::ValidationIssue,
+    application::security::auth_error::AuthError, domain::validation_issue::ValidationIssue,
     infrastructure::database::database_error::DatabaseError,
 };
 
 #[derive(Debug, Error)]
 pub enum UserError {
-    #[error("failed to hash password: {0}")]
-    HashingError(HashError),
+    #[error("user authentication failed: {0}")]
+    AuthenticationError(AuthError),
     #[error("user repository error: {0}")]
     Storage(DatabaseError),
     #[error("invalid user input: {0:?}")]

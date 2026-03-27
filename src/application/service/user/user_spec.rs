@@ -2,9 +2,9 @@ use std::fmt::Display;
 use uuid::Uuid;
 
 use crate::{
-    application::service::user::{
-        create_user_params::CreateUserParams,
-        user_service::{generate_password_hash, generate_salt},
+    application::{
+        security::auth::{generate_password_hash, generate_salt},
+        service::user::create_user_params::CreateUserParams,
     },
     domain::errors::user_error::UserError,
 };
@@ -36,7 +36,7 @@ impl TryFrom<CreateUserParams> for UserSpec {
     fn try_from(params: CreateUserParams) -> Result<Self, Self::Error> {
         let password_salt = generate_salt();
         let password_hash = generate_password_hash(params.password.as_bytes(), &password_salt)
-            .map_err(UserError::HashingError)?;
+            .map_err(UserError::AuthenticationError)?;
 
         Ok(Self {
             uuid: Uuid::now_v7(),

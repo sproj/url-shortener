@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use crate::application::startup_error::StartupError;
+use crate::application::{security::jwt::JwtKeys, startup_error::StartupError};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -10,6 +10,8 @@ pub struct Config {
     pub db: DbConfig,
     // Redis configuration.
     pub redis: RedisConfig,
+    // JWT configuration
+    pub jwt: JwtConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -32,6 +34,16 @@ pub struct DbConfig {
 pub struct RedisConfig {
     pub redis_host: String,
     pub redis_port: u16,
+}
+
+#[derive(Clone, Debug)]
+pub struct JwtConfig {
+    pub jwt_secret: String,
+    pub jwt_keys: JwtKeys,
+    pub jwt_expire_access_token_seconds: i64,
+    pub jwt_expire_refresh_token_seconds: i64,
+    pub jwt_validation_leeway_seconds: i64,
+    pub jwt_enable_revoked_tokens: bool,
 }
 
 impl Config {
@@ -66,6 +78,8 @@ pub fn load() -> Result<Config, StartupError> {
         tracing::info!(%env_file, "config file not found, reading from environment");
     }
 
+    let jwt_secret = env_get("JWT_SECRET")?;
+
     let cfg = Config {
         app: AppConfig {
             service_host: env_get("SERVICE_HOST")?,
@@ -82,6 +96,14 @@ pub fn load() -> Result<Config, StartupError> {
         redis: RedisConfig {
             redis_host: env_get("REDIS_HOST")?,
             redis_port: env_parse("REDIS_PORT")?,
+        },
+        jwt: JwtConfig {
+            jwt_keys: JwtKeys::new(jwt_secret.as_bytes()),
+            jwt_secret,
+            jwt_expire_access_token_seconds: env_parse("JWT_EXPIRE_ACCESS_TOKEN_SECONDS")?,
+            jwt_expire_refresh_token_seconds: env_parse("JWT_EXPIRE_REFRESH_TOKEN_SECONDS")?,
+            jwt_validation_leeway_seconds: env_parse("JWT_VALIDATION_LEEWAY_SECONDS")?,
+            jwt_enable_revoked_tokens: env_parse("JWT_ENABLE_REVOKED_TOKENS")?,
         },
     };
 
@@ -117,6 +139,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::application::security::jwt::JwtKeys;
+
     use super::*;
     use std::sync::{Mutex, MutexGuard};
 
@@ -181,6 +205,14 @@ mod tests {
             redis: RedisConfig {
                 redis_host: "127.0.0.1".to_string(),
                 redis_port: 6379,
+            },
+            jwt: JwtConfig {
+                jwt_secret: "secret".to_string(),
+                jwt_keys: JwtKeys::new("secret".as_bytes()),
+                jwt_expire_access_token_seconds: 60,
+                jwt_expire_refresh_token_seconds: 600,
+                jwt_validation_leeway_seconds: 30,
+                jwt_enable_revoked_tokens: false,
             },
         }
     }
