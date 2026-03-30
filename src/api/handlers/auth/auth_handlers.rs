@@ -26,7 +26,9 @@ pub async fn login(
                 user,
                 &state.jwt_encoding_key,
                 state.jwt_access_token_seconds,
+                state.jwt_refresh_token_seconds,
             )?;
+
             Ok(tokens_to_response(tokens))
         }
         Err(UserError::NotFound(e)) => {

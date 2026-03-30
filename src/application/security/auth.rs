@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     application::security::{
         auth_error::AuthError,
-        jwt::{AccessClaims, JwtTokens},
+        jwt::{AccessClaims, JwtTokenType, JwtTokens, RefreshClaims},
     },
     domain::models::user::User,
 };
@@ -36,6 +36,76 @@ pub fn generate_password_hash(pw: &[u8], salt: &SaltString) -> Result<String, Au
         .map_err(AuthError::HashingError)?
         .to_string();
     Ok(password_hash)
+}
+
+pub fn generate_tokens(
+    user: User,
+    encoding_key: &EncodingKey,
+    access_token_expiry_seconds: i64,
+    refresh_token_expiry_seconds: i64,
+) -> Result<JwtTokens, AuthError> {
+    let time_now = chrono::Utc::now();
+    let iat = time_now.timestamp() as usize;
+    let sub = user.uuid.to_string();
+
+    let access_token_id = Uuid::now_v7().to_string();
+    let refresh_token_id = Uuid::now_v7().to_string();
+
+    let access_token_exp =
+        (time_now + chrono::Duration::seconds(access_token_expiry_seconds)).timestamp() as usize;
+    let refresh_token_exp =
+        (time_now + chrono::Duration::seconds(refresh_token_expiry_seconds)).timestamp() as usize;
+
+    let access_claims = AccessClaims {
+        sub: sub.clone(),
+        jti: access_token_id.clone(),
+        iat,
+        exp: access_token_exp,
+        roles: user.roles.clone(),
+        aud: "url-shortener".to_string(),
+        iss: "url-shortener".to_string(),
+        typ: JwtTokenType::AccessToken as u8,
+    };
+
+    let refresh_claims: RefreshClaims = RefreshClaims {
+        sub,
+        jti: refresh_token_id,
+        iat,
+        exp: refresh_token_exp,
+        prf: access_token_id,
+        pex: access_token_exp,
+        typ: JwtTokenType::RefreshToken as u8,
+        roles: user.roles,
+    };
+
+    tracing::debug!("JWT: generated claims\naccess {:#?}", access_claims,);
+
+    let access_token = jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &access_claims,
+        encoding_key,
+    )
+    .map_err(|e| {
+        tracing::error!(%e, "failed to encode access token");
+        AuthError::TokenCreation
+    })?;
+
+    let refresh_token = jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &refresh_claims,
+        encoding_key,
+    )
+    .map_err(|e| {
+        tracing::error!(%e, "failed to encode refresh token");
+        AuthError::TokenCreation
+    })?;
+
+    tracing::debug!("JWT: generated tokens\naccess success.");
+
+    Ok(JwtTokens {
+        access_token,
+        refresh_token,
+    })
 }
 
 #[cfg(test)]
@@ -77,45 +147,4 @@ mod tests {
 
         assert_ne!(hash1, hash2);
     }
-}
-
-pub fn generate_tokens(
-    user: User,
-    encoding_key: &EncodingKey,
-    expiry_seconds: i64,
-) -> Result<JwtTokens, AuthError> {
-    let time_now = chrono::Utc::now();
-    let iat = time_now.timestamp() as usize;
-    let sub = user.uuid.to_string();
-
-    let access_token_id = Uuid::now_v7().to_string();
-
-    let access_token_exp =
-        (time_now + chrono::Duration::seconds(expiry_seconds)).timestamp() as usize;
-
-    let access_claims = AccessClaims {
-        sub: sub.clone(),
-        jti: access_token_id.clone(),
-        iat,
-        exp: access_token_exp,
-        roles: user.roles.clone(),
-        aud: "url-shortener".to_string(),
-        iss: "url-shortener".to_string(),
-    };
-
-    tracing::debug!("JWT: generated claims\naccess {:#?}", access_claims,);
-
-    let access_token = jsonwebtoken::encode(
-        &jsonwebtoken::Header::default(),
-        &access_claims,
-        encoding_key,
-    )
-    .map_err(|e| {
-        tracing::error!(%e, "failed to encode token");
-        AuthError::TokenCreation
-    })?;
-
-    tracing::debug!("JWT: generated tokens\naccess success.");
-
-    Ok(JwtTokens { access_token })
 }

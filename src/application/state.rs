@@ -16,4 +16,5 @@ pub struct AppState {
     pub jwt_encoding_key: Arc<EncodingKey>,
     pub jwt_decoding_key: Arc<DecodingKey>,
     pub jwt_access_token_seconds: i64,
+    pub jwt_refresh_token_seconds: i64,
 }

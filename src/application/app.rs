@@ -104,6 +104,7 @@ impl AppBuilder {
             jwt_decoding_key: Arc::new(self.config.jwt.jwt_keys.decoding.clone()),
             jwt_encoding_key: Arc::new(self.config.jwt.jwt_keys.encoding.clone()),
             jwt_access_token_seconds: self.config.jwt.jwt_expire_access_token_seconds,
+            jwt_refresh_token_seconds: self.config.jwt.jwt_expire_refresh_token_seconds,
         });
         Ok(App {
             config: self.config,
