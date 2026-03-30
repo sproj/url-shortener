@@ -24,7 +24,7 @@ pub async fn login(
     match user_service::verify_login(&state.db_pool, parsed_login_request.into()).await {
         Ok(user) => {
             let tokens = generate_tokens(
-                state.jwt_encoding_key.clone(),
+                &state.jwt_encoding_key,
                 state.jwt_access_token_seconds,
                 state.jwt_refresh_token_seconds,
                 user,

@@ -39,7 +39,7 @@ pub fn generate_password_hash(pw: &[u8], salt: &SaltString) -> Result<String, Au
 }
 
 pub fn generate_tokens(
-    jwt_encoding_key: EncodingKey,
+    jwt_encoding_key: &EncodingKey,
     access_token_expiry_seconds: i64,
     refresh_token_expiry_seconds: i64,
     user: User,
@@ -83,7 +83,7 @@ pub fn generate_tokens(
     let access_token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         &access_claims,
-        &jwt_encoding_key,
+        jwt_encoding_key,
     )
     .map_err(|e| {
         tracing::error!(%e, "failed to encode access token");
@@ -93,7 +93,7 @@ pub fn generate_tokens(
     let refresh_token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         &refresh_claims,
-        &jwt_encoding_key,
+        jwt_encoding_key,
     )
     .map_err(|e| {
         tracing::error!(%e, "failed to encode refresh token");
