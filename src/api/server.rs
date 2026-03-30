@@ -116,6 +116,7 @@ mod tests {
             app: AppConfig {
                 service_host: "127.0.0.1".to_string(),
                 service_port: port,
+                max_retries: 5,
             },
             db: DbConfig {
                 postgres_user: "admin".to_string(),

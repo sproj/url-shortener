@@ -6,7 +6,10 @@ use axum::{
 
 use crate::{
     api::error::ApiError,
-    application::{service::short_url::short_url_service::RedirectDecision, state::SharedState},
+    application::{
+        service::short_url::short_url_service::{RedirectDecision, resolve_redirect_decision},
+        state::SharedState,
+    },
     domain::errors::ShortUrlError,
 };
 
@@ -15,7 +18,8 @@ pub async fn redirect(
     Path(code): Path<String>,
     method: Method,
 ) -> Result<Response, ApiError> {
-    let decision = state.short_url.resolve_redirect_decision(&code).await?;
+    let decision =
+        resolve_redirect_decision(&state.db_pool, state.redirect_cache.clone(), &code).await?;
 
     match decision {
         RedirectDecision::Gone => Ok(StatusCode::GONE.into_response()),
