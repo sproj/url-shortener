@@ -8,7 +8,7 @@ use crate::{
     api::{error::ApiError, handlers::auth::login_request::LoginRequest},
     application::{
         security::{auth::generate_tokens, auth_error::AuthError, jwt::tokens_to_response},
-        service::user::user_service,
+        service::auth::auth_service,
         state::SharedState,
     },
     domain::errors::user_error::UserError,
@@ -21,7 +21,7 @@ pub async fn login(
     let Json(parsed_login_request) =
         payload.map_err(|e| UserError::UnprocessableInput(e.to_string()))?;
 
-    match user_service::verify_login(&state.db_pool, parsed_login_request.into()).await {
+    match auth_service::verify_login(&state.db_pool, parsed_login_request.into()).await {
         Ok(user) => {
             let tokens = generate_tokens(
                 &state.jwt_encoding_key,
