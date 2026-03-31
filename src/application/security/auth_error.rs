@@ -5,6 +5,8 @@ use axum::response::IntoResponse;
 use serde_json::json;
 use thiserror::Error;
 
+use crate::infrastructure::redis::cache_error::CacheError;
+
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("failed to hash password input: {0}")]
@@ -21,6 +23,8 @@ pub enum AuthError {
     Forbidden,
     #[error("token signature has expired")]
     ExpiredSignature(String),
+    #[error("cache layer error: {0}")]
+    CachingError(CacheError),
 }
 
 impl IntoResponse for AuthError {
@@ -35,6 +39,7 @@ impl IntoResponse for AuthError {
             AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
             AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
             AuthError::ExpiredSignature(_) => (StatusCode::UNAUTHORIZED, "Token signature expired"),
+            AuthError::CachingError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "cache layer error"),
         };
 
         let body = Json(json!({

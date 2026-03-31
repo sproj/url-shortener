@@ -20,10 +20,19 @@ pub async fn get_one_by_uuid(pool: &Pool, uuid: Uuid) -> Result<Option<User>, Us
         .map_err(UserError::from)
 }
 
-pub async fn delete_one_by_uuid(pool: &Pool, uuid: Uuid) -> Result<bool, UserError> {
-    repository::soft_delete_user_by_uuid(pool, uuid)
+pub async fn delete_one_by_uuid(pool: &Pool, user_uuid: Uuid) -> Result<bool, UserError> {
+    if repository::soft_delete_user_by_uuid(pool, user_uuid)
         .await
-        .map_err(UserError::from)
+        .map_err(UserError::from)?
+    {
+        Ok(true)
+    } else {
+        tracing::warn!(%user_uuid, "deletion attempted for user with unfound uuid");
+        Err(UserError::NotFound(format!(
+            "user with uuid {} not found",
+            user_uuid
+        )))
+    }
 }
 
 pub async fn add_user(pool: &Pool, params: CreateUserParams) -> Result<User, UserError> {

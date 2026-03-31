@@ -168,7 +168,10 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::{application::security::auth::generate_tokens, domain::models::user::User};
+    use crate::{
+        application::security::auth::{encode_tokens, generate_claims},
+        domain::models::user::User,
+    };
 
     fn test_keys() -> JwtKeys {
         JwtKeys::new(b"test-secret-for-unit-tests-only-32b")
@@ -211,10 +214,12 @@ mod tests {
         let user = make_test_user();
         let expected_uuid = user.uuid.to_string();
 
-        let tokens = generate_tokens(&keys.encoding, 120, 750, user).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+        let claims = generate_claims(120, 750, user).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert_eq!(claims.sub, expected_uuid);
+        assert_eq!(actual.sub, expected_uuid);
     }
 
     #[test]
@@ -223,10 +228,12 @@ mod tests {
         let mut user = make_test_user();
         user.roles = "admin,user".to_string();
 
-        let tokens = generate_tokens(&keys.encoding, 120, 750, user).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+        let claims = generate_claims(120, 750, user).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert_eq!(claims.roles, "admin,user");
+        assert_eq!(actual.roles, "admin,user");
     }
 
     #[test]
@@ -236,31 +243,39 @@ mod tests {
         let expiry_seconds = 300;
         let before = Utc::now().timestamp();
 
-        let tokens = generate_tokens(&keys.encoding, expiry_seconds, -750, user).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+        let claims = generate_claims(expiry_seconds, -750, user).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
         let after = Utc::now().timestamp() as usize;
-        assert!(claims.exp >= before as usize + expiry_seconds as usize);
-        assert!(claims.exp <= after as usize + expiry_seconds as usize);
+        assert!(actual.exp >= before as usize + expiry_seconds as usize);
+        assert!(actual.exp <= after as usize + expiry_seconds as usize);
     }
 
     #[test]
     fn token_aud_and_iss_are_set() {
         let keys = test_keys();
-        let tokens = generate_tokens(&keys.encoding, 120, 750, make_test_user()).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert_eq!(claims.aud, "url-shortener");
-        assert_eq!(claims.iss, "url-shortener");
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert_eq!(actual.aud, "url-shortener");
+        assert_eq!(actual.iss, "url-shortener");
     }
 
     #[test]
     fn token_jti_is_non_empty() {
         let keys = test_keys();
-        let tokens = generate_tokens(&keys.encoding, 120, 750, make_test_user()).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert!(!claims.jti.is_empty());
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert!(!actual.jti.is_empty());
     }
 
     // --- decode_token rejection cases ---
@@ -269,10 +284,12 @@ mod tests {
     fn decode_rejects_expired_token() {
         let keys = test_keys();
         // exp = now - 120s, leeway = 60s, so this is definitely expired
-        let tokens = generate_tokens(&keys.encoding, -120, -60, make_test_user()).unwrap();
+        let claims = generate_claims(-120, -60, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+
         let result = decode_token::<AccessClaims>(&tokens.access_token, &keys.decoding);
 
-        dbg!("result: {}", &result);
         assert!(matches!(result, Err(AuthError::ExpiredSignature(_))));
     }
 
@@ -281,7 +298,10 @@ mod tests {
         let keys = test_keys();
         let other_keys = JwtKeys::new(b"a-completely-different-secret-key");
 
-        let tokens = generate_tokens(&keys.encoding, 120, 750, make_test_user()).unwrap();
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+
         let result = decode_token::<AccessClaims>(&tokens.access_token, &other_keys.decoding);
 
         assert!(matches!(result, Err(AuthError::InvalidToken)));
@@ -290,7 +310,9 @@ mod tests {
     #[test]
     fn decode_rejects_tampered_payload() {
         let keys = test_keys();
-        let tokens = generate_tokens(&keys.encoding, 120, 750, make_test_user()).unwrap();
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 
         let parts: Vec<&str> = tokens.access_token.split('.').collect();
         let tampered = format!("{}.dGFtcGVyZWQ.{}", parts[0], parts[2]);

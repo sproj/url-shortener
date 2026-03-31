@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::Deserialize;
 
 use crate::application::service::user::login_params::LoginParams;
@@ -8,11 +10,17 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-impl From<LoginRequest> for LoginParams {
-    fn from(req: LoginRequest) -> Self {
+impl From<&LoginRequest> for LoginParams {
+    fn from(req: &LoginRequest) -> Self {
         Self {
-            username: req.username,
-            password: req.password,
+            username: req.username.clone(),
+            password: req.password.clone(),
         }
+    }
+}
+
+impl Display for LoginRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "username: {}", self.username)
     }
 }

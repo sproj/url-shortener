@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::application::service::auth::refresh_token_cache::RefreshTokenCache;
+use crate::application::service::auth::refresh_token_cache_trait::NoopRefreshTokenCache;
 use crate::application::service::short_url::code_generator::{CodeGenerator, RandomCodeGenerator};
 use crate::application::service::short_url::redirect_cache::RedirectCacheChecker;
 use crate::application::service::short_url::redirect_cache_trait::NoopRedirectCache;
@@ -89,9 +91,13 @@ impl AppBuilder {
             code_generator: self
                 .code_generator
                 .unwrap_or_else(|| Arc::new(RandomCodeGenerator)),
-            redirect_cache: match self.redis {
-                Some(conn) => Arc::new(RedirectCacheChecker::new(conn)),
+            redirect_cache: match &self.redis {
+                Some(conn) => Arc::new(RedirectCacheChecker::new(conn.clone())),
                 None => Arc::new(NoopRedirectCache),
+            },
+            refresh_token_cache: match &self.redis {
+                Some(conn) => Arc::new(RefreshTokenCache::new(conn.clone())),
+                None => Arc::new(NoopRefreshTokenCache),
             },
             max_retries: self.config.app.max_retries,
             db_pool: self.db_pool,

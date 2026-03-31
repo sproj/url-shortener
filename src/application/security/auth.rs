@@ -38,12 +38,16 @@ pub fn generate_password_hash(pw: &[u8], salt: &SaltString) -> Result<String, Au
     Ok(password_hash)
 }
 
-pub fn generate_tokens(
-    jwt_encoding_key: &EncodingKey,
+pub struct GeneratedClaimsDto {
+    pub access_claims: AccessClaims,
+    pub refresh_claims: RefreshClaims,
+}
+
+pub fn generate_claims(
     access_token_expiry_seconds: i64,
     refresh_token_expiry_seconds: i64,
     user: User,
-) -> Result<JwtTokens, AuthError> {
+) -> Result<GeneratedClaimsDto, AuthError> {
     let time_now = chrono::Utc::now();
     let iat = time_now.timestamp() as usize;
     let sub = user.uuid.to_string();
@@ -80,6 +84,17 @@ pub fn generate_tokens(
 
     tracing::debug!("JWT: generated claims\naccess {:#?}", access_claims,);
 
+    Ok(GeneratedClaimsDto {
+        access_claims,
+        refresh_claims,
+    })
+}
+
+pub fn encode_tokens(
+    jwt_encoding_key: &EncodingKey,
+    access_claims: AccessClaims,
+    refresh_claims: RefreshClaims,
+) -> Result<JwtTokens, AuthError> {
     let access_token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         &access_claims,

@@ -45,13 +45,9 @@ pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<String>, ApiError> {
-    if user_service::delete_one_by_uuid(&state.db_pool, uuid).await? {
-        tracing::debug!(%uuid, "user deleted");
-        Ok(Json(uuid.to_string()))
-    } else {
-        tracing::warn!(%uuid, "user not found for delete");
-        Err(ApiError::from(UserError::NotFound(uuid.to_string())))
-    }
+    user_service::delete_one_by_uuid(&state.db_pool, uuid).await?;
+    tracing::debug!(%uuid, "user deleted");
+    Ok(Json(uuid.to_string()))
 }
 
 pub async fn update_password(
