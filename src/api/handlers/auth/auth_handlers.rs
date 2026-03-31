@@ -7,7 +7,10 @@ use axum::{
 use crate::{
     api::{error::ApiError, handlers::auth::login_request::LoginRequest},
     application::{
-        security::{auth::encode_tokens, jwt::tokens_to_response},
+        security::{
+            auth::encode_tokens,
+            jwt::{AccessClaims, JwtTokens, RefreshClaims, tokens_to_response},
+        },
         service::{auth::auth_service, user::login_params::LoginParams},
         state::SharedState,
     },
@@ -43,4 +46,30 @@ pub async fn login(
 
     tracing::debug!(%parsed_login_request, "login successful, tokens issued");
     Ok(res)
+}
+
+pub async fn logout(
+    State(state): State<SharedState>,
+    access_claims: AccessClaims,
+) -> Result<(), ApiError> {
+    auth_service::revoke_refresh(&access_claims.jti, state.refresh_token_cache.clone())
+        .await
+        .map_err(ApiError::from)
+}
+
+pub async fn refresh_token(
+    State(state): State<SharedState>,
+    refresh_claims: RefreshClaims,
+) -> Result<Json<JwtTokens>, ApiError> {
+    let tokens = auth_service::refresh(
+        refresh_claims,
+        &state.db_pool,
+        state.jwt_access_token_seconds,
+        state.jwt_refresh_token_seconds,
+        &state.jwt_encoding_key,
+        state.refresh_token_cache.clone(),
+    )
+    .await?;
+
+    Ok(Json(tokens))
 }

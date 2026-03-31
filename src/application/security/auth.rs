@@ -38,6 +38,19 @@ pub fn generate_password_hash(pw: &[u8], salt: &SaltString) -> Result<String, Au
     Ok(password_hash)
 }
 
+pub fn validate_token_type(claims: &RefreshClaims, expected_type: JwtTokenType) -> bool {
+    if claims.typ == expected_type as u8 {
+        true
+    } else {
+        tracing::error!(
+            "Invalid token type. Expected {:?}, Found {:?}",
+            expected_type,
+            JwtTokenType::from(claims.typ),
+        );
+        false
+    }
+}
+
 pub struct GeneratedClaimsDto {
     pub access_claims: AccessClaims,
     pub refresh_claims: RefreshClaims,
