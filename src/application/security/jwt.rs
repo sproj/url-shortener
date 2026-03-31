@@ -30,6 +30,7 @@ impl JwtKeys {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct JwtTokens {
     pub access_token: String,
     pub refresh_token: String,

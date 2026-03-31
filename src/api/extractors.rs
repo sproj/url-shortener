@@ -15,13 +15,26 @@ use crate::{
     application::{
         security::{
             auth_error::AuthError,
-            jwt::{AccessClaims, ClaimsMethods, decode_token},
+            jwt::{AccessClaims, ClaimsMethods, RefreshClaims, decode_token},
         },
         state::SharedState,
     },
 };
 
 impl<S> FromRequestParts<S> for AccessClaims
+where
+    SharedState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        decode_token_from_request_part(parts, state)
+            .await
+            .map_err(ApiError::from)
+    }
+}
+
+impl<S> FromRequestParts<S> for RefreshClaims
 where
     SharedState: FromRef<S>,
     S: Send + Sync,

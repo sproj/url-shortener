@@ -57,7 +57,7 @@ pub async fn logout(
         .map_err(ApiError::from)
 }
 
-pub async fn refresh_token(
+pub async fn refresh(
     State(state): State<SharedState>,
     refresh_claims: RefreshClaims,
 ) -> Result<Json<JwtTokens>, ApiError> {

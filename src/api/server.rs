@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        handlers::auth::auth_handlers::login,
+        handlers::auth::auth_handlers::{login, logout, refresh},
         routes::{redirect_routes, short_url_routes, users_routes},
     },
     application::{config::Config, startup_error::StartupError, state::SharedState},
@@ -32,6 +32,8 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
 pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
     let router = Router::new()
         .route("/login", post(login))
+        .route("/logout", post(logout))
+        .route("/refresh", post(refresh))
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
         .nest("/shorten", short_url_routes::routes())
