@@ -38,6 +38,7 @@ pub struct JwtTokens {
 pub fn tokens_to_response(jwt_tokens: JwtTokens) -> impl IntoResponse {
     let json = json!({
         "access_token": jwt_tokens.access_token,
+        "refresh_token": jwt_tokens.refresh_token,
         "token_type": "Bearer"
     });
     Json(json)
