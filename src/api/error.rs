@@ -157,10 +157,10 @@ impl From<AuthError> for ApiError {
                 ApiError::new(auth_error_message).kind(ApiErrorKind::Unauthorized)
             }
             AuthError::InvalidToken => {
-                ApiError::new(auth_error_message).kind(ApiErrorKind::UnprocessableInput)
+                ApiError::new(auth_error_message).kind(ApiErrorKind::Unauthorized)
             }
             AuthError::MissingCredentials => {
-                ApiError::new(auth_error_message).kind(ApiErrorKind::UnprocessableInput)
+                ApiError::new(auth_error_message).kind(ApiErrorKind::Unauthorized)
             }
             AuthError::TokenCreation => {
                 ApiError::new("failed to create token").kind(ApiErrorKind::Internal)
