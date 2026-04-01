@@ -15,13 +15,26 @@ use crate::{
     application::{
         security::{
             auth_error::AuthError,
-            jwt::{AccessClaims, ClaimsMethods, decode_token},
+            jwt::{AccessClaims, ClaimsMethods, JwtTokenType, RefreshClaims, decode_token},
         },
         state::SharedState,
     },
 };
 
 impl<S> FromRequestParts<S> for AccessClaims
+where
+    SharedState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        decode_token_from_request_part(parts, state)
+            .await
+            .map_err(ApiError::from)
+    }
+}
+
+impl<S> FromRequestParts<S> for RefreshClaims
 where
     SharedState: FromRef<S>,
     S: Send + Sync,
@@ -54,6 +67,11 @@ where
 
     // Decode the token.
     let claims = decode_token::<T>(bearer.token(), &state.jwt_decoding_key)?;
+
+    if !(JwtTokenType::from(claims.get_typ()) == T::EXPECTED_TYPE) {
+        tracing::warn!("wrong token type in authorization header");
+        return Err(AuthError::InvalidToken);
+    }
 
     Ok(claims)
 }

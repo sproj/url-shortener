@@ -18,6 +18,7 @@ pub struct Config {
 pub struct AppConfig {
     pub service_host: String,
     pub service_port: u16,
+    pub max_retries: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +85,7 @@ pub fn load() -> Result<Config, StartupError> {
         app: AppConfig {
             service_host: env_get("SERVICE_HOST")?,
             service_port: env_parse("SERVICE_PORT")?,
+            max_retries: env_parse("MAX_RETRIES")?,
         },
         db: DbConfig {
             postgres_user: env_get("POSTGRES_USER")?,
@@ -179,6 +181,7 @@ mod tests {
             app: AppConfig {
                 service_host: "bad host name with spaces".to_string(),
                 service_port: config.app.service_port,
+                max_retries: 5,
             },
             ..config
         };
@@ -193,6 +196,7 @@ mod tests {
             app: AppConfig {
                 service_host: "127.0.0.1".to_string(),
                 service_port: 0,
+                max_retries: 5,
             },
             db: DbConfig {
                 postgres_user: "admin".to_string(),

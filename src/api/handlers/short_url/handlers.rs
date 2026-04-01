@@ -13,13 +13,14 @@ use crate::{
             create_short_url_response::CreateShortUrlResponse,
         },
     },
+    application::service::short_url::short_url_service,
     application::state::SharedState,
     domain::errors::ShortUrlError,
     domain::models::short_url::ShortUrl,
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
-    let short_urls = state.short_url.get_all().await?;
+    let short_urls = short_url_service::get_all(&state.db_pool).await?;
     tracing::debug!(?short_urls, "get all ok");
     Ok(Json(short_urls))
 }
@@ -29,7 +30,7 @@ pub async fn get_one_by_uuid(
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<ShortUrl>, ApiError> {
     tracing::debug!(%uuid, "get one by uuid");
-    if let Some(short) = state.short_url.get_by_uuid(uuid).await? {
+    if let Some(short) = short_url_service::get_by_uuid(&state.db_pool, uuid).await? {
         tracing::debug!(?short, "ok");
         Ok(Json(short))
     } else {
@@ -43,7 +44,7 @@ pub async fn get_one_by_code(
     Path(code): Path<String>,
 ) -> Result<Json<ShortUrl>, ApiError> {
     tracing::debug!(%code, "get one by code");
-    if let Some(short) = state.short_url.get_by_code(&code).await? {
+    if let Some(short) = short_url_service::get_by_code(&state.db_pool, &code).await? {
         tracing::debug!(%short, "ok");
         Ok(Json(short))
     } else {
@@ -65,7 +66,13 @@ pub async fn add_one(
 
     let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
 
-    let created = state.short_url.add_one(dto).await?;
+    let created = short_url_service::add_one(
+        &state.db_pool,
+        state.code_generator.clone(),
+        state.max_retries,
+        dto,
+    )
+    .await?;
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
     tracing::debug!(%payload, "ok");
@@ -77,7 +84,9 @@ pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<String>, ApiError> {
-    if state.short_url.delete_one_by_uuid(uuid).await? {
+    if short_url_service::delete_one_by_uuid(&state.db_pool, state.redirect_cache.clone(), uuid)
+        .await?
+    {
         tracing::debug!(%uuid, "ok");
         Ok(Json(uuid.to_string()))
     } else {

@@ -13,14 +13,17 @@ use crate::{
             user_response::UserResponse,
         },
     },
-    application::{service::user::create_user_params::CreateUserParams, state::SharedState},
+    application::{
+        service::user::{create_user_params::CreateUserParams, user_service},
+        state::SharedState,
+    },
     domain::errors::user_error::UserError,
 };
 
 pub async fn get_all(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<UserResponse>>, ApiError> {
-    let users = state.users.list_all().await?;
+    let users = user_service::list_all(&state.db_pool).await?;
     Ok(Json(users.into_iter().map(UserResponse::from).collect()))
 }
 
@@ -29,7 +32,7 @@ pub async fn get_one_by_uuid(
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<UserResponse>, ApiError> {
     tracing::debug!(%uuid, "get user by uuid");
-    match state.users.get_one_by_uuid(uuid).await? {
+    match user_service::get_one_by_uuid(&state.db_pool, uuid).await? {
         Some(user) => Ok(Json(user.into())),
         None => {
             tracing::warn!(%uuid, "user not found");
@@ -42,13 +45,9 @@ pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<String>, ApiError> {
-    if state.users.delete_one_by_uuid(uuid).await? {
-        tracing::debug!(%uuid, "user deleted");
-        Ok(Json(uuid.to_string()))
-    } else {
-        tracing::warn!(%uuid, "user not found for delete");
-        Err(ApiError::from(UserError::NotFound(uuid.to_string())))
-    }
+    user_service::delete_one_by_uuid(&state.db_pool, uuid).await?;
+    tracing::debug!(%uuid, "user deleted");
+    Ok(Json(uuid.to_string()))
 }
 
 pub async fn update_password(
@@ -59,11 +58,7 @@ pub async fn update_password(
     let Json(parsed_input) =
         req_payload.map_err(|e| UserError::UnprocessableInput(e.to_string()))?;
 
-    if state
-        .users
-        .update_password_by_uuid(parsed_input.password, uuid)
-        .await?
-    {
+    if user_service::update_password_by_uuid(&state.db_pool, parsed_input.password, uuid).await? {
         Ok(StatusCode::OK)
     } else {
         Err(ApiError::from(UserError::NotFound(uuid.to_string())))
@@ -79,7 +74,7 @@ pub async fn create_user(
 
     let dto: CreateUserParams = parsed_input.into();
 
-    let created = state.users.add_user(dto).await?;
+    let created = user_service::add_user(&state.db_pool, dto).await?;
     let res = created.into();
 
     Ok((StatusCode::CREATED, Json(res)))

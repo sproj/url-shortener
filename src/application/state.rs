@@ -4,16 +4,20 @@ use deadpool_postgres::Pool;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 
 use crate::application::service::{
-    short_url::short_url_service::ShortUrlService, user::user_service::UsersService,
+    auth::refresh_token_cache_trait::RefreshTokenCacheTrait,
+    short_url::{code_generator::CodeGenerator, redirect_cache_trait::RedirectCache},
 };
 
 pub type SharedState = Arc<AppState>;
 
 pub struct AppState {
-    pub short_url: Arc<ShortUrlService>,
-    pub users: Arc<UsersService>,
     pub db_pool: Pool,
-    pub jwt_encoding_key: Arc<EncodingKey>,
-    pub jwt_decoding_key: Arc<DecodingKey>,
+    pub code_generator: Arc<dyn CodeGenerator>,
+    pub redirect_cache: Arc<dyn RedirectCache>,
+    pub refresh_token_cache: Arc<dyn RefreshTokenCacheTrait>,
+    pub max_retries: u8,
+    pub jwt_encoding_key: EncodingKey,
+    pub jwt_decoding_key: DecodingKey,
     pub jwt_access_token_seconds: i64,
+    pub jwt_refresh_token_seconds: i64,
 }

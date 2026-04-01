@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use crate::application::repository::short_url_repository::ShortUrlRepository;
+use crate::application::service::auth::refresh_token_cache::RefreshTokenCache;
+use crate::application::service::auth::refresh_token_cache_trait::NoopRefreshTokenCache;
 use crate::application::service::short_url::code_generator::{CodeGenerator, RandomCodeGenerator};
 use crate::application::service::short_url::redirect_cache::RedirectCacheChecker;
 use crate::application::service::short_url::redirect_cache_trait::NoopRedirectCache;
-use crate::application::service::short_url::short_url_service::ShortUrlService;
-use crate::application::service::user::user_service::UsersService;
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppState, SharedState};
 use crate::{api::server, application::config::Config};
@@ -89,21 +88,23 @@ impl AppBuilder {
 
     pub async fn build(self) -> Result<App, StartupError> {
         let state = Arc::new(AppState {
-            short_url: Arc::new(ShortUrlService::new(
-                Arc::new(ShortUrlRepository::new(self.db_pool.clone())),
-                self.code_generator
-                    .unwrap_or_else(|| Arc::new(RandomCodeGenerator)),
-                self.max_retries.unwrap_or(5),
-                match self.redis {
-                    Some(conn) => Arc::new(RedirectCacheChecker::new(conn)),
-                    None => Arc::new(NoopRedirectCache),
-                },
-            )),
-            users: Arc::new(UsersService::new(self.db_pool.clone())),
+            code_generator: self
+                .code_generator
+                .unwrap_or_else(|| Arc::new(RandomCodeGenerator)),
+            redirect_cache: match &self.redis {
+                Some(conn) => Arc::new(RedirectCacheChecker::new(conn.clone())),
+                None => Arc::new(NoopRedirectCache),
+            },
+            refresh_token_cache: match &self.redis {
+                Some(conn) => Arc::new(RefreshTokenCache::new(conn.clone())),
+                None => Arc::new(NoopRefreshTokenCache),
+            },
+            max_retries: self.config.app.max_retries,
             db_pool: self.db_pool,
-            jwt_decoding_key: Arc::new(self.config.jwt.jwt_keys.decoding.clone()),
-            jwt_encoding_key: Arc::new(self.config.jwt.jwt_keys.encoding.clone()),
+            jwt_decoding_key: self.config.jwt.jwt_keys.decoding.clone(),
+            jwt_encoding_key: self.config.jwt.jwt_keys.encoding.clone(),
             jwt_access_token_seconds: self.config.jwt.jwt_expire_access_token_seconds,
+            jwt_refresh_token_seconds: self.config.jwt.jwt_expire_refresh_token_seconds,
         });
         Ok(App {
             config: self.config,

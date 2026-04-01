@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CacheError {
+    #[error("redis pool connection error")]
+    PoolError(#[from] deadpool_redis::PoolError),
     #[error(transparent)]
     RedisError(#[from] redis::RedisError),
     #[error("serialization error {0}")]

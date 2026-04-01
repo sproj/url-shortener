@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Display;
 
-use crate::application::{constants::USER_ROLE_ADMIN, security::auth_error::AuthError};
+use crate::application::{
+    constants::USER_ROLE_ADMIN,
+    security::{auth_error::AuthError, roles},
+};
 
 #[derive(Clone)]
 pub struct JwtKeys {
@@ -27,12 +30,16 @@ impl JwtKeys {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct JwtTokens {
     pub access_token: String,
+    pub refresh_token: String,
 }
+
 pub fn tokens_to_response(jwt_tokens: JwtTokens) -> impl IntoResponse {
     let json = json!({
         "access_token": jwt_tokens.access_token,
+        "refresh_token": jwt_tokens.refresh_token,
         "token_type": "Bearer"
     });
     Json(json)
@@ -47,6 +54,7 @@ pub struct AccessClaims {
     pub exp: usize,
     pub jti: String,
     pub roles: String,
+    pub typ: u8,
 }
 
 impl Display for AccessClaims {
@@ -59,15 +67,55 @@ impl Display for AccessClaims {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RefreshClaims {
+    /// Subject.
+    pub sub: String,
+    /// JWT ID.
+    pub jti: String,
+    /// Issued time.
+    pub iat: usize,
+    /// Expiration time.
+    pub exp: usize,
+    /// Reference to paired access token,
+    pub prf: String,
+    /// Expiration time of paired access token,
+    pub pex: usize,
+    /// Token type.
+    pub typ: u8,
+    /// Roles.
+    pub roles: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum JwtTokenType {
+    AccessToken,
+    RefreshToken,
+    UnknownToken,
+}
+impl From<u8> for JwtTokenType {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::AccessToken,
+            1 => Self::RefreshToken,
+            _ => Self::UnknownToken,
+        }
+    }
+}
+
 pub trait ClaimsMethods {
+    const EXPECTED_TYPE: JwtTokenType;
     fn validate_role_admin(&self) -> Result<(), AuthError>;
     fn get_sub(&self) -> &str;
     fn get_exp(&self) -> usize;
     fn get_iat(&self) -> usize;
     fn get_jti(&self) -> &str;
+    fn get_typ(&self) -> u8;
 }
 
 impl ClaimsMethods for AccessClaims {
+    const EXPECTED_TYPE: JwtTokenType = JwtTokenType::AccessToken;
     fn validate_role_admin(&self) -> Result<(), AuthError> {
         if self
             .roles
@@ -95,6 +143,36 @@ impl ClaimsMethods for AccessClaims {
     fn get_jti(&self) -> &str {
         &self.jti
     }
+
+    fn get_typ(&self) -> u8 {
+        self.typ
+    }
+}
+
+impl ClaimsMethods for RefreshClaims {
+    const EXPECTED_TYPE: JwtTokenType = JwtTokenType::RefreshToken;
+    fn validate_role_admin(&self) -> Result<(), AuthError> {
+        roles::is_role_admin(&self.roles)
+    }
+    fn get_sub(&self) -> &str {
+        &self.sub
+    }
+
+    fn get_iat(&self) -> usize {
+        self.iat
+    }
+
+    fn get_exp(&self) -> usize {
+        self.exp
+    }
+
+    fn get_jti(&self) -> &str {
+        &self.jti
+    }
+
+    fn get_typ(&self) -> u8 {
+        self.typ
+    }
 }
 
 #[cfg(test)]
@@ -104,7 +182,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        application::security::auth::generate_tokens, domain::models::user::User,
+        application::security::auth::{encode_tokens, generate_claims},
+        domain::models::user::User,
     };
 
     fn test_keys() -> JwtKeys {
@@ -136,6 +215,7 @@ mod tests {
             exp: usize::MAX,
             jti: "test-jti".to_string(),
             roles: roles.to_string(),
+            typ: JwtTokenType::AccessToken as u8,
         }
     }
 
@@ -147,10 +227,12 @@ mod tests {
         let user = make_test_user();
         let expected_uuid = user.uuid.to_string();
 
-        let tokens = generate_tokens(user, &keys.encoding, 3600).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+        let claims = generate_claims(120, 750, user).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert_eq!(claims.sub, expected_uuid);
+        assert_eq!(actual.sub, expected_uuid);
     }
 
     #[test]
@@ -159,44 +241,54 @@ mod tests {
         let mut user = make_test_user();
         user.roles = "admin,user".to_string();
 
-        let tokens = generate_tokens(user, &keys.encoding, 3600).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+        let claims = generate_claims(120, 750, user).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert_eq!(claims.roles, "admin,user");
+        assert_eq!(actual.roles, "admin,user");
     }
 
     #[test]
     fn token_exp_is_approximately_now_plus_expiry() {
         let keys = test_keys();
         let user = make_test_user();
-        let expiry_seconds = 3600usize;
-        let before = Utc::now().timestamp() as usize;
+        let expiry_seconds = 300;
+        let before = Utc::now().timestamp();
 
-        let tokens = generate_tokens(user, &keys.encoding, expiry_seconds as i64).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+        let claims = generate_claims(expiry_seconds, -750, user).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
         let after = Utc::now().timestamp() as usize;
-        assert!(claims.exp >= before + expiry_seconds);
-        assert!(claims.exp <= after + expiry_seconds);
+        assert!(actual.exp >= before as usize + expiry_seconds as usize);
+        assert!(actual.exp <= after as usize + expiry_seconds as usize);
     }
 
     #[test]
     fn token_aud_and_iss_are_set() {
         let keys = test_keys();
-        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert_eq!(claims.aud, "url-shortener");
-        assert_eq!(claims.iss, "url-shortener");
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert_eq!(actual.aud, "url-shortener");
+        assert_eq!(actual.iss, "url-shortener");
     }
 
     #[test]
     fn token_jti_is_non_empty() {
         let keys = test_keys();
-        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
-        let claims: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
 
-        assert!(!claims.jti.is_empty());
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+        let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
+
+        assert!(!actual.jti.is_empty());
     }
 
     // --- decode_token rejection cases ---
@@ -205,7 +297,10 @@ mod tests {
     fn decode_rejects_expired_token() {
         let keys = test_keys();
         // exp = now - 120s, leeway = 60s, so this is definitely expired
-        let tokens = generate_tokens(make_test_user(), &keys.encoding, -120).unwrap();
+        let claims = generate_claims(-120, -60, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+
         let result = decode_token::<AccessClaims>(&tokens.access_token, &keys.decoding);
 
         assert!(matches!(result, Err(AuthError::ExpiredSignature(_))));
@@ -216,7 +311,10 @@ mod tests {
         let keys = test_keys();
         let other_keys = JwtKeys::new(b"a-completely-different-secret-key");
 
-        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
+
         let result = decode_token::<AccessClaims>(&tokens.access_token, &other_keys.decoding);
 
         assert!(matches!(result, Err(AuthError::InvalidToken)));
@@ -225,7 +323,9 @@ mod tests {
     #[test]
     fn decode_rejects_tampered_payload() {
         let keys = test_keys();
-        let tokens = generate_tokens(make_test_user(), &keys.encoding, 3600).unwrap();
+        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let tokens =
+            encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 
         let parts: Vec<&str> = tokens.access_token.split('.').collect();
         let tampered = format!("{}.dGFtcGVyZWQ.{}", parts[0], parts[2]);
@@ -274,6 +374,7 @@ pub fn decode_token<T: for<'de> serde::Deserialize<'de>>(
     validation.leeway = 60u64;
     validation.set_audience(&["url-shortener"]);
     validation.set_issuer(&["url-shortener"]);
+    validation.set_required_spec_claims(&["prf", "pex"]);
 
     let token_data = jsonwebtoken::decode::<T>(token, decoding_key, &validation).map_err(|e| {
         tracing::warn!(%e, "token validation rejected");
