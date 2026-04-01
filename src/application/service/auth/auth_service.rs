@@ -54,6 +54,13 @@ pub async fn cache_refresh_token(
     let refresh_exp_secs = refresh_claims.exp as u64;
     let now = chrono::Utc::now().timestamp();
     let ttl = std::time::Duration::from_secs(refresh_exp_secs.saturating_sub(now.max(0) as u64));
+    // SET EX 0 will be rejected by redis. If an exp passes between validation and now (what are the odds) it will look like a caching error rather than a coincidence.
+    // In any case the refresh token is now definitely expired so no new tokens for you.
+    if ttl.is_zero() {
+        return Err(AuthError::ExpiredSignature(
+            "refresh token expired between validation and refresh. Uncanny.".to_string(),
+        ));
+    }
 
     refresh_token_cache
         .set(&refresh_claims.prf, refresh_claims, ttl)

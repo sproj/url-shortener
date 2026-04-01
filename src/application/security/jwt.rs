@@ -87,7 +87,7 @@ pub struct RefreshClaims {
     pub roles: String,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum JwtTokenType {
     AccessToken,
@@ -105,14 +105,17 @@ impl From<u8> for JwtTokenType {
 }
 
 pub trait ClaimsMethods {
+    const EXPECTED_TYPE: JwtTokenType;
     fn validate_role_admin(&self) -> Result<(), AuthError>;
     fn get_sub(&self) -> &str;
     fn get_exp(&self) -> usize;
     fn get_iat(&self) -> usize;
     fn get_jti(&self) -> &str;
+    fn get_typ(&self) -> u8;
 }
 
 impl ClaimsMethods for AccessClaims {
+    const EXPECTED_TYPE: JwtTokenType = JwtTokenType::AccessToken;
     fn validate_role_admin(&self) -> Result<(), AuthError> {
         if self
             .roles
@@ -140,9 +143,14 @@ impl ClaimsMethods for AccessClaims {
     fn get_jti(&self) -> &str {
         &self.jti
     }
+
+    fn get_typ(&self) -> u8 {
+        self.typ
+    }
 }
 
 impl ClaimsMethods for RefreshClaims {
+    const EXPECTED_TYPE: JwtTokenType = JwtTokenType::RefreshToken;
     fn validate_role_admin(&self) -> Result<(), AuthError> {
         roles::is_role_admin(&self.roles)
     }
@@ -160,6 +168,10 @@ impl ClaimsMethods for RefreshClaims {
 
     fn get_jti(&self) -> &str {
         &self.jti
+    }
+
+    fn get_typ(&self) -> u8 {
+        self.typ
     }
 }
 
@@ -362,6 +374,7 @@ pub fn decode_token<T: for<'de> serde::Deserialize<'de>>(
     validation.leeway = 60u64;
     validation.set_audience(&["url-shortener"]);
     validation.set_issuer(&["url-shortener"]);
+    validation.set_required_spec_claims(&["prf", "pex"]);
 
     let token_data = jsonwebtoken::decode::<T>(token, decoding_key, &validation).map_err(|e| {
         tracing::warn!(%e, "token validation rejected");

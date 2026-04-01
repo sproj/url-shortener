@@ -15,7 +15,7 @@ use crate::{
     application::{
         security::{
             auth_error::AuthError,
-            jwt::{AccessClaims, ClaimsMethods, RefreshClaims, decode_token},
+            jwt::{AccessClaims, ClaimsMethods, JwtTokenType, RefreshClaims, decode_token},
         },
         state::SharedState,
     },
@@ -67,6 +67,11 @@ where
 
     // Decode the token.
     let claims = decode_token::<T>(bearer.token(), &state.jwt_decoding_key)?;
+
+    if !(JwtTokenType::from(claims.get_typ()) == T::EXPECTED_TYPE) {
+        tracing::warn!("wrong token type in authorization header");
+        return Err(AuthError::InvalidToken);
+    }
 
     Ok(claims)
 }
