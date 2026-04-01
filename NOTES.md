@@ -1,11 +1,10 @@
-# URL Shortener - Current Notes - 23 March 2026
+# URL Shortener - Current Notes - 1 April 2026
 
 ## Current snapshot
 
 Completed and working:
 
-- Public `short_url` API is now UUID-based; DB `id` is no longer exposed.
-- RPC-style `GET /shorten/getByCode/{code}` has been removed.
+- Public `short_url` API is UUID-based; DB `id` is not exposed.
 - Short URL HTTP surface currently includes:
   - `POST /shorten`
   - `GET /shorten`
@@ -24,19 +23,30 @@ Completed and working:
   - cache-disabled fallback via `NoopRedirectCache`
 - Retry-on-code-conflict behavior remains implemented and tested.
 
-## User/auth work now present
+## User and auth work now present
 
-- `users` table and ownership column on `short_url` are in migrations.
+- `users` table exists and `short_url.user_id` ownership column exists in migrations.
 - User vertical slice exists:
   - create user
   - list users
   - get user by UUID
   - soft delete user by UUID
   - update password
-- Password handling is in place with hashing + salt generation.
-- Basic login endpoint exists at root-level `/login`.
-- Current login behavior verifies username + password only.
-- JWT/session issuance is not yet in place.
+- Password hashing + salt generation are in place.
+- Auth HTTP surface now exists and works:
+  - `POST /login`
+  - `POST /logout`
+  - `POST /refresh`
+- Login issues:
+  - short-lived access token
+  - longer-lived refresh token
+- Refresh flow is implemented:
+  - refresh token is cached in Redis
+  - refresh rotates tokens
+  - old refresh token is revoked
+- Logout flow is implemented:
+  - cached refresh token is revoked
+- Access/refresh token type validation is enforced in extractors.
 
 ## Test picture
 
@@ -54,42 +64,38 @@ Green suites present:
 Coverage/testing status:
 
 - redirect/cache behavior is covered well
-- startup/config/database/redis error paths now have focused unit tests
-- shared integration-test helper noise from `dead_code` was handled with `#![allow(dead_code)]`
+- login, logout, and refresh flows are integration-tested
+- startup/config/database/redis error paths have focused unit tests
+- shared integration-test helper noise from `dead_code` was intentionally allowed in `tests/common`
 
 ## Current code quality state
 
 - App/test startup has been untangled substantially.
 - Shared Postgres and Redis test containers are in place.
-- `tracing` replaced most ad hoc prints in app code.
+- `tracing` replaced ad hoc prints in app code.
 - `unwrap` audit is effectively complete for non-test runtime paths.
+- RedisInsight is now in local `docker-compose.yaml` for cache inspection during development.
 
-## Next focus
+## Immediate next focus
 
-Primary likely next step:
-
-1. Add JWT to the login/logout/auth path.
-
-Likely work items:
-
-1. Decide token shape:
-   - claims
-   - expiry
-   - issuer/audience
-   - signing key source
-2. Decide auth lifecycle:
-   - login issues JWT
-   - logout semantics (stateless only vs revocation/blocklist)
-3. Add auth middleware/extractor for protected routes.
-4. Decide whether `short_url.user_id` ownership is enforced at create/read/delete time yet.
+1. Add protected routes using the existing access-token extractor foundation.
+2. Decide and implement ownership enforcement for user-owned short URLs.
+3. Add vanity URL support.
+4. Define collision/conflict policy for vanity codes:
+   - global uniqueness
+   - reserved values
+   - ownership rules
+   - update/delete behavior
 5. Add tests for:
-   - successful token issuance
-   - invalid credentials
-   - expired/invalid token
-   - unauthorized access to protected routes
+   - protected route requires valid access token
+   - wrong token type on protected route
+   - user cannot mutate another user's owned short URL
+   - vanity code conflict returns expected error
 
 ## Secondary follow-up
 
-1. Revisit deployment work after auth shape is clearer.
-2. Finalize Kubernetes manifests once runtime env and secret requirements are settled.
-3. Add deployment-oriented tracing/logging polish once the app is running in-cluster.
+1. Deployment work can resume once auth/ownership shape is settled.
+2. Finalize Kubernetes manifests once runtime secret/config requirements stop moving.
+3. Consider cleaning up `AppBuilder` overrides that are currently misleading:
+   - `with_state(...)` is unused
+   - `with_max_retries(...)` does not currently override `AppState.max_retries`
