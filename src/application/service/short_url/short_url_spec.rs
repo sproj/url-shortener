@@ -9,6 +9,7 @@ pub struct ShortUrlSpec {
     pub expires_at: Option<DateTime<Utc>>,
     pub uuid: Uuid,
     pub code: String,
+    pub user_id: Option<i64>,
 }
 
 impl ShortUrlSpec {

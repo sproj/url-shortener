@@ -13,6 +13,7 @@ pub struct ShortUrl {
     pub code: String,
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
+    pub user_id: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -63,6 +64,9 @@ impl TryFrom<&Row> for ShortUrl {
                 .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
             expires_at: row
                 .try_get("expires_at")
+                .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
+            user_id: row
+                .try_get::<_, Option<i64>>("user_id")
                 .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
             created_at: row
                 .try_get("created_at")

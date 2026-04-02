@@ -122,6 +122,7 @@ async fn expired_code_returns_410() {
         "http://expired.me",
         Some(Utc::now() - Duration::days(1)),
         None,
+        None,
     )
     .await;
 
@@ -146,6 +147,7 @@ async fn deleted_code_returns_410() {
         "http://deleted.me",
         None,
         Some(Utc::now() - Duration::minutes(1)),
+        None,
     )
     .await;
 
@@ -253,13 +255,14 @@ async fn seed_short_url_record(
     long_url: &str,
     expires_at: Option<chrono::DateTime<Utc>>,
     deleted_at: Option<chrono::DateTime<Utc>>,
+    user_id: Option<i64>,
 ) {
     let client = sut.state.db_pool.get().await.unwrap();
 
     client
         .execute(
-            "INSERT INTO short_url (uuid, code, long_url, expires_at, deleted_at) VALUES ($1, $2, $3, $4, $5)",
-            &[&Uuid::now_v7(), &code, &long_url, &expires_at, &deleted_at],
+            "INSERT INTO short_url (uuid, code, long_url, expires_at, deleted_at, user_id) VALUES ($1, $2, $3, $4, $5, $6)",
+            &[&Uuid::now_v7(), &code, &long_url, &expires_at, &deleted_at, &user_id],
         )
         .await
         .unwrap();

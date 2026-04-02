@@ -4,7 +4,7 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidationIssue {
-    pub field: &'static str,
+    pub field: String,
     pub code: &'static str,
     pub message: String,
 }
@@ -15,4 +15,4 @@ impl Display for ValidationIssue {
     }
 }
 
-pub type ValidationRule<T> = fn(&T, &mut Vec<ValidationIssue>);
+pub type ValidationRule<T> = fn(&T, &str, &mut Vec<ValidationIssue>);

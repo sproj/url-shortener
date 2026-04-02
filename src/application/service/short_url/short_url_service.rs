@@ -82,6 +82,7 @@ pub async fn add_one(
             expires_at: dto.expires_at,
             uuid,
             code: code_generator.next_code(),
+            user_id: None,
         };
 
         tracing::debug!(%attempt, %spec);

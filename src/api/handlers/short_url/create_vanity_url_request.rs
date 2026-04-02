@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::{
     api::handlers::short_url::{
@@ -10,16 +11,17 @@ use crate::{
 };
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct CreateShortUrlRequest {
+pub struct CreateVanityUrlRequest {
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
+    pub vanity_url: String,
+    pub user_uuid: Uuid,
 }
 
-impl TryFrom<CreateShortUrlRequest> for ValidatedCreateShortUrlRequest {
+impl TryFrom<CreateVanityUrlRequest> for ValidatedCreateShortUrlRequest {
     type Error = ShortUrlError;
-    fn try_from(value: CreateShortUrlRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: CreateVanityUrlRequest) -> Result<Self, Self::Error> {
         let target_url_input: &str = value.long_url.trim();
-
         let mut issues: Vec<ValidationIssue> = Vec::new();
 
         if let Some(time) = value.expires_at {
@@ -33,15 +35,15 @@ impl TryFrom<CreateShortUrlRequest> for ValidatedCreateShortUrlRequest {
 
         validate_url_input(target_url_input, "long_url", &mut issues)?;
 
-        if issues.is_empty() {
-            Ok(Self {
-                long_url: value.long_url.trim().to_string(),
-                expires_at: value.expires_at,
-                code: None,
-                user_uuid: None,
-            })
-        } else {
-            Err(ShortUrlError::InvalidInput(issues))
-        }
+        let vanity_url_input: &str = value.vanity_url.trim();
+
+        validate_url_input(vanity_url_input, "vanity_url", &mut issues)?;
+
+        Ok(Self {
+            long_url: value.long_url.trim().to_string(),
+            expires_at: value.expires_at,
+            code: Some(vanity_url_input.to_string()),
+            user_uuid: Some(value.user_uuid),
+        })
     }
 }

@@ -165,7 +165,7 @@ async fn empty_long_url_returns_correct_error() {
     assert_eq!(err.kind, ApiErrorKind::ValidationError);
     assert_eq!(
         pick_error_fields(&err, "invalid_input_url", "code"),
-        vec!["empty"]
+        vec!["parse_url"]
     );
 }
 
