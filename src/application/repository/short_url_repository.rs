@@ -7,10 +7,30 @@ use deadpool_postgres::{GenericClient, Pool};
 use tokio_postgres::types::{ToSql, Type};
 use uuid::Uuid;
 
+const SELECT_SHORT_URL_ROW: &str = "SELECT
+id, 
+uuid, 
+code, 
+long_url, 
+expires_at,
+user_id, 
+created_at, 
+updated_at, 
+deleted_at 
+FROM short_url
+";
+
+const WITHOUT_SOFT_DELETED: &str = "WHERE deleted_at IS NULL";
+
 pub async fn get_all(pool: &Pool) -> RepositoryResult<Vec<ShortUrl>> {
     let client = pool.get().await?;
 
-    let rows = client.query("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE deleted_at is NULL", &[]).await?;
+    let rows = client
+        .query(
+            format!("{} {}", SELECT_SHORT_URL_ROW, WITHOUT_SOFT_DELETED).as_str(),
+            &[],
+        )
+        .await?;
 
     rows.into_iter()
         .map(ShortUrl::try_from)
@@ -19,10 +39,12 @@ pub async fn get_all(pool: &Pool) -> RepositoryResult<Vec<ShortUrl>> {
 
 pub async fn get_by_uuid(pool: &Pool, uuid: Uuid) -> RepositoryResult<Option<ShortUrl>> {
     tracing::debug!(%uuid, "get by uuid");
-    pool
-        .get()
+    pool.get()
         .await?
-        .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE uuid = $1", &[&uuid])
+        .query_opt(
+            format!("{} {}", SELECT_SHORT_URL_ROW, "WHERE uuid = $1").as_str(),
+            &[&uuid],
+        )
         .await?
         .map(ShortUrl::try_from)
         .transpose()
@@ -30,8 +52,12 @@ pub async fn get_by_uuid(pool: &Pool, uuid: Uuid) -> RepositoryResult<Option<Sho
 
 pub async fn get_by_code(pool: &Pool, code: &str) -> RepositoryResult<Option<ShortUrl>> {
     tracing::debug!(%code, "get by code");
-    pool.get().await?
-        .query_opt("SELECT id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at FROM short_url WHERE code = $1", &[&code])
+    pool.get()
+        .await?
+        .query_opt(
+            format!("{} WHERE code = $1", SELECT_SHORT_URL_ROW).as_str(),
+            &[&code],
+        )
         .await?
         .map(ShortUrl::try_from)
         .transpose()
@@ -44,15 +70,20 @@ pub async fn add_one(pool: &Pool, spec: ShortUrlSpec) -> RepositoryResult<ShortU
 
     let insert_long_url = client
         .prepare_typed(
-            "INSERT INTO short_url (uuid, code, long_url, expires_at) \
-        VALUES ($1, $2, $3, $4) \
-        RETURNING id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at",
-            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ],
+            "INSERT INTO short_url (uuid, code, long_url, expires_at, user_id) \
+        VALUES ($1, $2, $3, $4, $5) \
+        RETURNING id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at, user_id",
+            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ, Type::INT8],
         )
         .await?;
 
-    let params: &[&(dyn ToSql + Sync); 4] =
-        &[&spec.uuid, &spec.code, &spec.long_url, &spec.expires_at];
+    let params: &[&(dyn ToSql + Sync); 5] = &[
+        &spec.uuid,
+        &spec.code,
+        &spec.long_url,
+        &spec.expires_at,
+        &spec.user_id,
+    ];
 
     let inserted_long_url_row = client.query_one(&insert_long_url, params).await?;
 

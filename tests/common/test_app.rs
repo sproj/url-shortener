@@ -109,6 +109,8 @@ impl TestAppBuilder {
 
         let listener = server::listen(config).await.unwrap();
         let addr = listener.local_addr().unwrap();
+
+        let _ = tracing_subscriber::fmt::try_init();
         tracing::info!(%addr, "test app listening");
 
         tokio::spawn(server::serve(listener, state.clone()));

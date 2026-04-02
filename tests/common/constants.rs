@@ -8,3 +8,4 @@ pub const API_PATH_USERS: &str = "users";
 pub const API_PATH_LOGIN: &str = "login";
 pub const API_PATH_LOGOUT: &str = "logout";
 pub const API_PATH_REFRESH: &str = "refresh";
+pub const API_PATH_VANITY: &str = "shorten/vanity";

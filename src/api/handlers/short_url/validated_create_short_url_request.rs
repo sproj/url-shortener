@@ -1,11 +1,14 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedCreateShortUrlRequest {
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
+    pub code: Option<String>,
+    pub user_uuid: Option<Uuid>,
 }
 
 impl Display for ValidatedCreateShortUrlRequest {

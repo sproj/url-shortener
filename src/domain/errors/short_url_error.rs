@@ -21,6 +21,8 @@ pub enum ShortUrlError {
     CodeGenerationExhausted,
     #[error("redis error: {0}")]
     Cache(#[from] CacheError),
+    #[error("conflict on code creation {0}")]
+    Conflict(String),
 }
 
 impl From<DatabaseError> for ShortUrlError {
@@ -74,6 +76,10 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::Cache(e) => {
                 tracing::error!(%e, "cache level error");
                 ApiError::new("cache layer caused error").kind(ApiErrorKind::Internal)
+            }
+            ShortUrlError::Conflict(e) => {
+                tracing::error!("conflict on attempted vanity url creation");
+                ApiError::new(e).kind(ApiErrorKind::Conflict).message(e)
             }
         }
     }

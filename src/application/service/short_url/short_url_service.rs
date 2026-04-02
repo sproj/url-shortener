@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     api::handlers::short_url::ValidatedCreateShortUrlRequest,
     application::{
-        repository::short_url_repository as repository,
+        repository::{short_url_repository as repository, users_repository},
         service::short_url::{
             ShortUrlSpec, code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
         },
@@ -67,7 +67,7 @@ pub async fn delete_one_by_uuid(
     }
 }
 
-pub async fn add_one(
+pub async fn add_generated_code(
     db_pool: &Pool,
     code_generator: Arc<dyn CodeGenerator>,
     max_retries: u8,
@@ -76,12 +76,26 @@ pub async fn add_one(
     // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
     let uuid = uuid::Uuid::now_v7();
 
+    let mut user_id: Option<i64> = None;
+    if let Some(user_uuid) = dto.user_uuid {
+        if let Some(user) = users_repository::get_user_by_uuid(db_pool, user_uuid).await? {
+            user_id = Some(user.id);
+        } else {
+            return Err(ShortUrlError::NotFound(
+                "failed to find user creating a vanity url".to_string(),
+            ));
+        }
+    }
     for attempt in 1..=max_retries {
         let spec = ShortUrlSpec {
             long_url: dto.long_url.clone(),
             expires_at: dto.expires_at,
             uuid,
-            code: code_generator.next_code(),
+            code: match dto.code {
+                None => code_generator.next_code(),
+                Some(ref vanity_url) => vanity_url.clone(),
+            },
+            user_id,
         };
 
         tracing::debug!(%attempt, %spec);
@@ -120,6 +134,57 @@ pub async fn add_one(
     }
     tracing::error!(%dto, "code generation exhausted");
     Err(ShortUrlError::CodeGenerationExhausted)
+}
+
+pub async fn add_vanity_url(
+    db_pool: &Pool,
+    code_generator: Arc<dyn CodeGenerator>,
+    dto: ValidatedCreateShortUrlRequest,
+) -> Result<ShortUrl, ShortUrlError> {
+    // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
+    let uuid = uuid::Uuid::now_v7();
+
+    let mut user_id: Option<i64> = None;
+    if let Some(user_uuid) = dto.user_uuid {
+        if let Some(user) = users_repository::get_user_by_uuid(db_pool, user_uuid).await? {
+            user_id = Some(user.id);
+        } else {
+            return Err(ShortUrlError::NotFound(
+                "failed to find user creating a vanity url".to_string(),
+            ));
+        }
+    }
+
+    let spec = ShortUrlSpec {
+        long_url: dto.long_url.clone(),
+        expires_at: dto.expires_at,
+        uuid,
+        code: match dto.code {
+            None => code_generator.next_code(),
+            Some(ref vanity_url) => vanity_url.clone(),
+        },
+        user_id,
+    };
+
+    tracing::debug!(%spec);
+
+    match repository::add_one(db_pool, spec).await {
+        Ok(created) => Ok(created),
+        Err(DatabaseError::Conflict {
+            state,
+            constraint,
+            message,
+        }) => {
+            tracing::warn!(
+                ?state, %message, constraint, "conflict on vanity url insertion"
+            );
+            Err(ShortUrlError::Conflict(message))
+        }
+        Err(e) => {
+            tracing::error!(%e, "short url insertion error");
+            Err(ShortUrlError::Storage(e))
+        }
+    }
 }
 
 pub async fn resolve_redirect_decision(
