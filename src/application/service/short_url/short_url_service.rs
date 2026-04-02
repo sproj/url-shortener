@@ -176,13 +176,9 @@ pub async fn add_vanity_url(
             message,
         }) => {
             tracing::warn!(
-                ?state, %message, "conflict"
+                ?state, %message, constraint, "conflict on vanity url insertion"
             );
-            Err(ShortUrlError::Storage(DatabaseError::Conflict {
-                state,
-                constraint,
-                message,
-            }))
+            Err(ShortUrlError::Conflict(message))
         }
         Err(e) => {
             tracing::error!(%e, "short url insertion error");

@@ -70,15 +70,20 @@ pub async fn add_one(pool: &Pool, spec: ShortUrlSpec) -> RepositoryResult<ShortU
 
     let insert_long_url = client
         .prepare_typed(
-            "INSERT INTO short_url (uuid, code, long_url, expires_at) \
-        VALUES ($1, $2, $3, $4) \
+            "INSERT INTO short_url (uuid, code, long_url, expires_at, user_id) \
+        VALUES ($1, $2, $3, $4, $5) \
         RETURNING id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at, user_id",
-            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ],
+            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ, Type::INT8],
         )
         .await?;
 
-    let params: &[&(dyn ToSql + Sync); 4] =
-        &[&spec.uuid, &spec.code, &spec.long_url, &spec.expires_at];
+    let params: &[&(dyn ToSql + Sync); 5] = &[
+        &spec.uuid,
+        &spec.code,
+        &spec.long_url,
+        &spec.expires_at,
+        &spec.user_id,
+    ];
 
     let inserted_long_url_row = client.query_one(&insert_long_url, params).await?;
 

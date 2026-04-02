@@ -22,6 +22,7 @@ pub enum ApiErrorKind {
     ValidationError,
     Forbidden,
     Unauthorized,
+    Conflict,
     #[default]
     Internal,
 }
@@ -38,6 +39,7 @@ impl Display for ApiErrorKind {
                 ApiErrorKind::Internal => "unexpected internal error",
                 ApiErrorKind::Forbidden => "user action not permitted",
                 ApiErrorKind::Unauthorized => "authorization requirement not met",
+                ApiErrorKind::Conflict => "conflict on database insertion",
             }
         )
     }
@@ -52,6 +54,7 @@ impl ApiErrorKind {
             ApiErrorKind::UnprocessableInput => StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorKind::Forbidden => StatusCode::FORBIDDEN,
             ApiErrorKind::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
 }

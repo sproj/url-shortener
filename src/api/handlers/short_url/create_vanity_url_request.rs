@@ -39,7 +39,7 @@ impl TryFrom<(CreateVanityUrlRequest, Uuid)> for ValidatedCreateShortUrlRequest 
 
         let vanity_url_input: &str = value.vanity_url.trim();
 
-        validate_url_input(vanity_url_input, "vanity_url", &mut issues)?;
+        // validate_url_input(vanity_url_input, "vanity_url", &mut issues)?;
 
         Ok(Self {
             long_url: value.long_url.trim().to_string(),
