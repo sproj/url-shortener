@@ -7,7 +7,7 @@ use deadpool_postgres::{GenericClient, Pool};
 use tokio_postgres::types::{ToSql, Type};
 use uuid::Uuid;
 
-const SELECT_USER_ROW: &str = "SELECT
+const SELECT_SHORT_URL_ROW: &str = "SELECT
 id, 
 uuid, 
 code, 
@@ -20,14 +20,14 @@ deleted_at
 FROM short_url
 ";
 
-const WITHOUT_SOLT_DELETED: &str = "WHERE deleted_at IS NULL";
+const WITHOUT_SOFT_DELETED: &str = "WHERE deleted_at IS NULL";
 
 pub async fn get_all(pool: &Pool) -> RepositoryResult<Vec<ShortUrl>> {
     let client = pool.get().await?;
 
     let rows = client
         .query(
-            format!("{} {}", SELECT_USER_ROW, WITHOUT_SOLT_DELETED).as_str(),
+            format!("{} {}", SELECT_SHORT_URL_ROW, WITHOUT_SOFT_DELETED).as_str(),
             &[],
         )
         .await?;
@@ -42,7 +42,7 @@ pub async fn get_by_uuid(pool: &Pool, uuid: Uuid) -> RepositoryResult<Option<Sho
     pool.get()
         .await?
         .query_opt(
-            format!("{} {}", SELECT_USER_ROW, "WHERE uuid = $1").as_str(),
+            format!("{} {}", SELECT_SHORT_URL_ROW, "WHERE uuid = $1").as_str(),
             &[&uuid],
         )
         .await?
@@ -55,7 +55,7 @@ pub async fn get_by_code(pool: &Pool, code: &str) -> RepositoryResult<Option<Sho
     pool.get()
         .await?
         .query_opt(
-            format!("{} WHERE code = $1", SELECT_USER_ROW).as_str(),
+            format!("{} WHERE code = $1", SELECT_SHORT_URL_ROW).as_str(),
             &[&code],
         )
         .await?

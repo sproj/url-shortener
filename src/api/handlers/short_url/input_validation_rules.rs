@@ -26,9 +26,13 @@ pub fn validate_url_input(
         rule(input, field_name, issues);
     }
 
+    if !issues.is_empty() {
+        return Err(ShortUrlError::InvalidInput(issues.to_vec()));
+    }
+
     let target_url = url::Url::parse(input).map_err(|e| {
         ShortUrlError::InvalidInput(vec![ValidationIssue {
-            field: "long_url".to_string(),
+            field: field_name.to_string(),
             code: "parse_url",
             message: e.to_string(),
         }])

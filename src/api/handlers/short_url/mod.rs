@@ -12,4 +12,7 @@ pub use create_short_url_response::CreateShortUrlResponse;
 pub use create_vanity_url_request::CreateVanityUrlRequest;
 pub use validated_create_short_url_request::ValidatedCreateShortUrlRequest;
 
-pub use handlers::{add_one, delete_one_by_uuid, get_all, get_one_by_code, get_one_by_uuid};
+pub use handlers::{
+    create_short_url, create_vanity_url, delete_one_by_uuid, get_all, get_one_by_code,
+    get_one_by_uuid,
+};

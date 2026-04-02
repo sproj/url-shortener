@@ -9,14 +9,17 @@ use crate::{
     api::{
         error::ApiError,
         handlers::short_url::{
-            ValidatedCreateShortUrlRequest, create_short_url_request::CreateShortUrlRequest,
+            CreateVanityUrlRequest, ValidatedCreateShortUrlRequest,
+            create_short_url_request::CreateShortUrlRequest,
             create_short_url_response::CreateShortUrlResponse,
         },
     },
-    application::service::short_url::short_url_service,
-    application::state::SharedState,
-    domain::errors::ShortUrlError,
-    domain::models::short_url::ShortUrl,
+    application::{
+        security::{auth_error::AuthError, jwt::AccessClaims},
+        service::short_url::short_url_service,
+        state::SharedState,
+    },
+    domain::{errors::ShortUrlError, models::short_url::ShortUrl},
 };
 
 pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
@@ -53,7 +56,7 @@ pub async fn get_one_by_code(
     }
 }
 
-pub async fn add_one(
+pub async fn create_short_url(
     State(state): State<SharedState>,
     req_payload: Result<Json<CreateShortUrlRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateShortUrlResponse>), ApiError> {
@@ -66,13 +69,42 @@ pub async fn add_one(
 
     let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
 
-    let created = short_url_service::add_one(
+    let created = short_url_service::add_generated_code(
         &state.db_pool,
         state.code_generator.clone(),
         state.max_retries,
         dto,
     )
     .await?;
+
+    let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
+    tracing::debug!(%payload, "ok");
+
+    Ok((StatusCode::CREATED, Json(payload)))
+}
+
+pub async fn create_vanity_url(
+    access_claims: AccessClaims,
+    State(state): State<SharedState>,
+    req_payload: Result<Json<CreateVanityUrlRequest>, JsonRejection>,
+) -> Result<(StatusCode, Json<CreateShortUrlResponse>), ApiError> {
+    // if payload argument is `Json(payload): Json<CreateShortUrl>`
+    // then if the payload is mal-formed or cannot map to target axum replies with a 400 instead of a 422.
+    // Also the returned error is not an ApiError, so no details or error code as the user can expect of other error paths.
+    // So do the parsing step manually and map the parsing error to the same error structure as the rest of the api.
+    let Json(parsed_input) =
+        req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
+
+    let user_uuid =
+        Uuid::parse_str(&access_claims.sub).map_err(|_| ApiError::from(AuthError::InvalidToken))?;
+
+    let dto: ValidatedCreateShortUrlRequest = (parsed_input, user_uuid)
+        .try_into()
+        .map_err(ApiError::from)?;
+
+    let created =
+        short_url_service::add_vanity_url(&state.db_pool, state.code_generator.clone(), dto)
+            .await?;
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
     tracing::debug!(%payload, "ok");
