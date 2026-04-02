@@ -5,7 +5,9 @@ use uuid::Uuid;
 use crate::{
     api::handlers::short_url::{
         ValidatedCreateShortUrlRequest,
-        input_validation_rules::{url_cannot_expire_in_the_past, validate_url_input},
+        input_validation_rules::{
+            url_cannot_expire_in_the_past, validate_url_input, validate_vanity_code,
+        },
     },
     domain::{errors::ShortUrlError, validation_issue::ValidationIssue},
 };
@@ -39,7 +41,11 @@ impl TryFrom<(CreateVanityUrlRequest, Uuid)> for ValidatedCreateShortUrlRequest 
 
         let vanity_url_input: &str = value.vanity_url.trim();
 
-        // validate_url_input(vanity_url_input, "vanity_url", &mut issues)?;
+        validate_vanity_code(vanity_url_input, &mut issues);
+
+        if !issues.is_empty() {
+            return Err(ShortUrlError::InvalidInput(issues));
+        }
 
         Ok(Self {
             long_url: value.long_url.trim().to_string(),

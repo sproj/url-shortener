@@ -236,3 +236,85 @@ async fn vanity_url_is_associated_with_creating_user() {
         "vanity url should have an associated user_id"
     );
 }
+
+#[tokio::test]
+async fn vanity_code_with_invalid_characters_is_rejected() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let token = create_user_and_login(&client, &sut, "vanity_invalid_chars").await;
+
+    let res = client
+        .post(sut.build_path(API_PATH_VANITY))
+        .bearer_auth(&token)
+        .json(&json!({
+            "long_url": "http://example.com",
+            "vanity_url": "invalid code!",
+            "expires_at": null,
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    let err: url_shortener::api::error::ApiError = res.json().await.unwrap();
+    assert_eq!(
+        err.kind,
+        url_shortener::api::error::ApiErrorKind::ValidationError
+    );
+}
+
+#[tokio::test]
+async fn vanity_code_exceeding_max_length_is_rejected() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let token = create_user_and_login(&client, &sut, "vanity_too_long_code").await;
+    let long_code = "a".repeat(65);
+
+    let res = client
+        .post(sut.build_path(API_PATH_VANITY))
+        .bearer_auth(&token)
+        .json(&json!({
+            "long_url": "http://example.com",
+            "vanity_url": long_code,
+            "expires_at": null,
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    let err: url_shortener::api::error::ApiError = res.json().await.unwrap();
+    assert_eq!(
+        err.kind,
+        url_shortener::api::error::ApiErrorKind::ValidationError
+    );
+}
+
+#[tokio::test]
+async fn empty_vanity_code_is_rejected() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let token = create_user_and_login(&client, &sut, "vanity_empty_code").await;
+
+    let res = client
+        .post(sut.build_path(API_PATH_VANITY))
+        .bearer_auth(&token)
+        .json(&json!({
+            "long_url": "http://example.com",
+            "vanity_url": "",
+            "expires_at": null,
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    let err: url_shortener::api::error::ApiError = res.json().await.unwrap();
+    assert_eq!(
+        err.kind,
+        url_shortener::api::error::ApiErrorKind::ValidationError
+    );
+}

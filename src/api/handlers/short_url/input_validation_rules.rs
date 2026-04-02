@@ -49,6 +49,36 @@ pub fn validate_url_input(
     }
 }
 
+pub fn validate_vanity_code(input: &str, issues: &mut Vec<ValidationIssue>) {
+    if input.is_empty() {
+        issues.push(ValidationIssue {
+            field: "vanity_url".to_string(),
+            code: "empty",
+            message: "vanity code must not be empty".to_string(),
+        });
+        return;
+    }
+    if input.len() > 64 {
+        issues.push(ValidationIssue {
+            field: "vanity_url".to_string(),
+            code: "too_long",
+            message: "vanity code must not exceed 64 characters".to_string(),
+        });
+    }
+    if !input
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        issues.push(ValidationIssue {
+            field: "vanity_url".to_string(),
+            code: "invalid_characters",
+            message:
+                "vanity code may only contain alphanumeric characters, hyphens, and underscores"
+                    .to_string(),
+        });
+    }
+}
+
 pub const TARGET_URL_INPUT_VALIDATION_RULES: &[ValidationRule<str>] = &[
     long_url_input_must_not_be_empty,
     long_url_input_must_not_be_too_long,
