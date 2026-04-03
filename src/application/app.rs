@@ -39,10 +39,8 @@ impl App {
 pub struct AppBuilder {
     config: Config,
     db_pool: Pool,
-    state: Option<SharedState>,
     redis: Option<MultiplexedConnection>,
     code_generator: Option<Arc<dyn CodeGenerator>>,
-    max_retries: Option<u8>,
 }
 
 impl AppBuilder {
@@ -50,10 +48,8 @@ impl AppBuilder {
         Self {
             config,
             db_pool,
-            state: None,
             redis: None,
             code_generator: None,
-            max_retries: None,
         }
     }
     pub fn with_config(mut self, config: Config) -> Self {
@@ -66,11 +62,6 @@ impl AppBuilder {
         self
     }
 
-    pub fn with_state(mut self, state: SharedState) -> Self {
-        self.state = Some(state);
-        self
-    }
-
     pub fn with_redis(mut self, redis: MultiplexedConnection) -> Self {
         self.redis = Some(redis);
         self
@@ -78,11 +69,6 @@ impl AppBuilder {
 
     pub fn with_code_generator(mut self, code_generator: Arc<dyn CodeGenerator>) -> Self {
         self.code_generator = Some(code_generator);
-        self
-    }
-
-    pub fn with_max_retries(mut self, max_retries: u8) -> Self {
-        self.max_retries = Some(max_retries);
         self
     }
 

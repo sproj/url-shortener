@@ -43,7 +43,6 @@ pub struct TestAppBuilder {
     db: Option<Arc<SharedTestDb>>,
     redis: Option<Arc<SharedTestRedis>>,
     code_generator: Option<Arc<dyn CodeGenerator>>,
-    max_retries: Option<u8>,
 }
 
 impl TestAppBuilder {
@@ -64,11 +63,6 @@ impl TestAppBuilder {
 
     pub fn with_code_generator(mut self, code_generator: Arc<dyn CodeGenerator>) -> Self {
         self.code_generator = Some(code_generator);
-        self
-    }
-
-    pub fn with_max_retries(mut self, max_retries: u8) -> Self {
-        self.max_retries = Some(max_retries);
         self
     }
 
@@ -93,10 +87,6 @@ impl TestAppBuilder {
 
         if let Some(code_generator) = self.code_generator {
             app_builder = app_builder.with_code_generator(code_generator);
-        }
-
-        if let Some(max_retries) = self.max_retries {
-            app_builder = app_builder.with_max_retries(max_retries);
         }
 
         if let Some(redis) = &self.redis {
@@ -143,7 +133,6 @@ impl Default for TestAppBuilder {
             db: None,
             redis: None,
             code_generator: None,
-            max_retries: None,
         }
     }
 }

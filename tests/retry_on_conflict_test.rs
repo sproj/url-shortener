@@ -21,7 +21,6 @@ async fn add_one_retries_on_code_conflict_then_succeeds() {
             "conflict-code".to_string(),
             "recovered-code".to_string(),
         ])))
-        .with_max_retries(5)
         .build()
         .await;
 
@@ -57,7 +56,6 @@ async fn add_one_returns_500_when_code_generation_retries_are_exhausted() {
             .map(str::to_owned)
             .collect(),
         )))
-        .with_max_retries(5)
         .build()
         .await;
 

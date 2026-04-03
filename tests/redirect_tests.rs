@@ -270,4 +270,3 @@ async fn create_short_url(
 
     create.json().await.unwrap()
 }
-
