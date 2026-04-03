@@ -11,7 +11,7 @@ use crate::{
 #[derive(Deserialize, Debug, Clone)]
 pub struct UpdateShortUrlRequest {
     long_url: Option<String>,
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Option<DateTime<Utc>>>,
     code: Option<String>,
 }
 
@@ -28,38 +28,43 @@ impl TryFrom<UpdateShortUrlRequest> for ValidatedUpdateShortUrlRequest {
         }
 
         let mut issues: Vec<ValidationIssue> = Vec::new();
-
-        if let Some(time) = value.expires_at {
+        if let Some(Some(time)) = value.expires_at {
             url_cannot_expire_in_the_past(&time, &mut issues);
-        }
+        };
 
         // do not bother parsing and applying url validation issues to obviously crap input.
         if !issues.is_empty() {
             return Err(ShortUrlError::InvalidInput(issues));
         }
-
-        if let Some(long_url) = value.long_url.clone() {
-            let long_url_input = long_url.trim();
-            validate_url_input(long_url_input, "long_url", &mut issues)?;
-        }
+        let long_url_input = match value.long_url {
+            Some(long) => {
+                let s = long.trim();
+                validate_url_input(s, "long_url", &mut issues)?;
+                Some(s.to_string())
+            }
+            None => None,
+        };
 
         if !issues.is_empty() {
             return Err(ShortUrlError::InvalidInput(issues));
         }
 
-        if let Some(code) = value.code.clone() {
-            let code_input = code.trim();
-
-            validate_vanity_code(code_input, &mut issues);
-        }
+        let code_input = match value.code {
+            Some(input) => {
+                let s = input.trim();
+                validate_vanity_code(s, &mut issues);
+                Some(s.to_string())
+            }
+            None => None,
+        };
 
         if !issues.is_empty() {
             return Err(ShortUrlError::InvalidInput(issues));
         }
 
         Ok(Self {
-            long_url: value.long_url,
-            code: value.code,
+            long_url: long_url_input,
+            code: code_input,
             expires_at: value.expires_at,
         })
     }
@@ -68,6 +73,6 @@ impl TryFrom<UpdateShortUrlRequest> for ValidatedUpdateShortUrlRequest {
 #[derive(Debug)]
 pub struct ValidatedUpdateShortUrlRequest {
     pub long_url: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Option<DateTime<Utc>>>,
     pub code: Option<String>,
 }

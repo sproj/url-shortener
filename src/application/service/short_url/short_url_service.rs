@@ -204,11 +204,16 @@ pub async fn update_one_by_uuid(
         Some(short) => short,
     };
 
+    let short_owner_db_id = match short.user_id {
+        Some(user_db_id) => user_db_id,
+        None => return Err(ShortUrlError::Unauthorized(AuthError::Forbidden)),
+    };
+
     let old_code = short.code.clone();
 
     if users_repository::get_user_by_uuid(db_pool, user_uuid)
         .await?
-        .is_none_or(|user| user.id != short.id)
+        .is_none_or(|user| user.id != short_owner_db_id)
     {
         return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
     }
@@ -221,8 +226,9 @@ pub async fn update_one_by_uuid(
             None => short.long_url,
         },
         expires_at: match dto.expires_at {
-            Some(new_expiry) => Some(new_expiry),
-            None => short.expires_at,
+            Some(None) => None, // expires_at was explicity set to nothing -> updating redirect to permanent
+            Some(Some(new_expiry)) => Some(new_expiry), // expires_at as just pushed to some future date
+            None => short.expires_at, // no expires_at input from the user - keep the existing one (if any)
         },
         code: match dto.code {
             Some(new_code) => new_code,
@@ -230,9 +236,23 @@ pub async fn update_one_by_uuid(
         },
     };
 
-    let update_result = repository::update_one_by_uuid(db_pool, spec)
-        .await
-        .map_err(ShortUrlError::Storage)?;
+    let update_result = match repository::update_one_by_uuid(db_pool, spec).await {
+        Ok(created) => Ok(created),
+        Err(DatabaseError::Conflict {
+            state,
+            constraint,
+            message,
+        }) => {
+            tracing::warn!(
+                ?state, %message, constraint, "conflict on vanity url insertion"
+            );
+            Err(ShortUrlError::Conflict(message))
+        }
+        Err(e) => {
+            tracing::error!(%e, "short url insertion error");
+            Err(ShortUrlError::Storage(e))
+        }
+    }?;
 
     redirect_cache.delete(&old_code).await?;
 

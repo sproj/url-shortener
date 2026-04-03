@@ -111,7 +111,6 @@ pub async fn create_vanity_url(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
-#[axum::debug_handler]
 pub async fn update_one_by_uuid(
     Path(uuid): Path<Uuid>,
     access_claims: AccessClaims,

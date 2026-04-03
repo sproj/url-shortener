@@ -48,7 +48,11 @@ pub async fn get_by_uuid(pool: &Pool, uuid: Uuid) -> RepositoryResult<Option<Sho
     pool.get()
         .await?
         .query_opt(
-            format!("{} {}", SELECT_SHORT_URL_ROW, "WHERE uuid = $1").as_str(),
+            format!(
+                "{} {} {}",
+                SELECT_SHORT_URL_ROW, "WHERE uuid = $1", "AND deleted_at IS NULL"
+            )
+            .as_str(),
             &[&uuid],
         )
         .await?
