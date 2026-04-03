@@ -22,11 +22,12 @@ FROM short_url
 
 const WITHOUT_SOFT_DELETED: &str = "WHERE deleted_at IS NULL";
 
-const UPDATE_SHORT_URL_ROW: &str = "UPDATE short_url SET 
+const UPDATE_SHORT_URL_ROW: &str = "UPDATE short_url SET
 long_url = $1,
 code = $2,
-expires_at = $3 
-WHERE uuid = $4";
+expires_at = $3
+WHERE uuid = $4
+RETURNING id, uuid, code, long_url, expires_at, user_id, created_at, updated_at, deleted_at";
 
 pub async fn get_all(pool: &Pool) -> RepositoryResult<Vec<ShortUrl>> {
     let client = pool.get().await?;
