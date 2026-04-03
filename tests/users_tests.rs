@@ -6,32 +6,37 @@ use url_shortener::api::{
 };
 use uuid::Uuid;
 
-use crate::common::{constants::API_PATH_USERS, test_app::TestApp};
+use crate::common::{
+    constants::API_PATH_USERS,
+    helpers::{create_user_and_login, login_as_admin},
+    test_app::TestApp,
+};
 
 pub mod common;
+
+// --- Unauthenticated (public) operations ---
 
 #[tokio::test]
 async fn create_user_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(API_PATH_USERS);
 
-    let expected_username = "test";
-    let expected_email = "test@test.com";
-
-    let expected = json!({
-        "username": expected_username,
-        "email": expected_email,
-        "password": "test"
-    });
-
-    let res = client.post(url).json(&expected).send().await.unwrap();
+    let res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "create_user_succeeds",
+            "email": "create_user_succeeds@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), StatusCode::CREATED);
 
     let actual = res.json::<UserResponse>().await.unwrap();
-    assert_eq!(actual.username, expected_username);
-    assert_eq!(actual.email, expected_email);
+    assert_eq!(actual.username, "create_user_succeeds");
+    assert_eq!(actual.email, "create_user_succeeds@test.com");
     assert_eq!(actual.active, true);
     assert_eq!(actual.roles, "user");
     assert!(actual.deleted_at.is_none());
@@ -42,10 +47,8 @@ async fn mal_formed_payload_fails() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let url = sut.build_path(API_PATH_USERS);
-
     let actual = client
-        .post(url)
+        .post(sut.build_path(API_PATH_USERS))
         .header("content-type", "application/json")
         .body(r#"{"username":"durkadurr","email": durk@durr.com, password: }"#)
         .send()
@@ -58,86 +61,173 @@ async fn mal_formed_payload_fails() {
     assert_eq!(err.kind, ApiErrorKind::UnprocessableInput);
 }
 
+// --- get_all ---
+
 #[tokio::test]
-async fn get_all_users_succeeds() {
+async fn get_all_requires_auth() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(API_PATH_USERS);
 
-    let expected_username = "test_get_all_users";
-    let expected_email = "test_get_all_users@test.com";
-
-    let expected = json!({
-        "username": expected_username,
-        "email": expected_email,
-        "password": "test"
-    });
-
-    let create_res = client
-        .post(url.clone())
-        .json(&expected)
+    let res = client
+        .get(sut.build_path(API_PATH_USERS))
         .send()
         .await
         .unwrap();
 
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_all_requires_admin() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let token = create_user_and_login(&client, &sut, "get_all_non_admin").await;
+
+    let res = client
+        .get(sut.build_path(API_PATH_USERS))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn get_all_users_succeeds() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    // Create a regular user to confirm they appear in the list
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "get_all_list_member",
+            "email": "get_all_list_member@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(create_res.status(), StatusCode::CREATED);
-
     let user = create_res.json::<UserResponse>().await.unwrap();
-    let expected_uuid = user.uuid;
 
-    assert_ne!(expected_uuid, Uuid::nil());
-    assert_eq!(user.username, expected_username);
-    assert_eq!(user.email, expected_email);
-    assert_eq!(user.active, true);
-    assert_eq!(user.roles, "user");
-    assert!(user.deleted_at.is_none());
+    let token = login_as_admin(&client, &sut).await;
 
-    let res = client.get(url).send().await.unwrap();
+    let res = client
+        .get(sut.build_path(API_PATH_USERS))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), StatusCode::OK);
-
     let actual = res.json::<Vec<UserResponse>>().await.unwrap();
+    assert!(actual.iter().any(|ur| ur.uuid == user.uuid));
+}
 
-    assert!(actual.iter().any(|ur| ur.uuid == expected_uuid));
+// --- get_one ---
+
+#[tokio::test]
+async fn get_one_requires_auth() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "get_one_no_auth",
+            "email": "get_one_no_auth@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let user = create_res.json::<UserResponse>().await.unwrap();
+
+    let res = client
+        .get(sut.build_path(format!("{}/{}", API_PATH_USERS, user.uuid).as_str()))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_one_forbidden_for_other_user() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    // Create user A — the target
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "get_one_target",
+            "email": "get_one_target@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let target = create_res.json::<UserResponse>().await.unwrap();
+
+    // User B attempts to read user A's record
+    let token_b = create_user_and_login(&client, &sut, "get_one_intruder").await;
+
+    let res = client
+        .get(sut.build_path(format!("{}/{}", API_PATH_USERS, target.uuid).as_str()))
+        .bearer_auth(&token_b)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
 async fn get_user_by_uuid_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(API_PATH_USERS);
 
-    let expected_username = "test_get_user_by_uuid_succeeds";
-    let expected_email = "test_get_user_by_uuid_succeeds@test.com";
-
-    let expected = json!({
-        "username": expected_username,
-        "email": expected_email,
-        "password": "test"
-    });
-
+    // The helper doesn't return the UUID, so we do the create+login steps manually
     let create_res = client
-        .post(url.clone())
-        .json(&expected)
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "get_by_uuid_self_fetch",
+            "email": "get_by_uuid_self_fetch@test.com",
+            "password": "test_password"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let user = create_res.json::<UserResponse>().await.unwrap();
+
+    let login_res = client
+        .post(sut.build_path(crate::common::constants::API_PATH_LOGIN))
+        .json(&json!({ "username": "get_by_uuid_self_fetch", "password": "test_password" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(login_res.status(), StatusCode::OK);
+    let body: serde_json::Value = login_res.json().await.unwrap();
+    let own_token = body["access_token"].as_str().unwrap().to_string();
+
+    let res = client
+        .get(sut.build_path(format!("{}/{}", API_PATH_USERS, user.uuid).as_str()))
+        .bearer_auth(&own_token)
         .send()
         .await
         .unwrap();
 
-    assert_eq!(create_res.status(), StatusCode::CREATED);
-
-    let user = create_res.json::<UserResponse>().await.unwrap();
-    let expected_uuid = user.uuid;
-
-    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_USERS, expected_uuid).as_str());
-
-    let res = client.get(get_by_id_url).send().await.unwrap();
-
     assert_eq!(res.status(), StatusCode::OK);
-
     let actual = res.json::<UserResponse>().await.unwrap();
-
-    assert_eq!(actual.username, expected_username);
-    assert_eq!(actual.email, expected_email);
+    assert_eq!(actual.username, "get_by_uuid_self_fetch");
+    assert_eq!(actual.email, "get_by_uuid_self_fetch@test.com");
     assert_eq!(actual.active, true);
 }
 
@@ -145,101 +235,242 @@ async fn get_user_by_uuid_succeeds() {
 async fn get_user_by_uuid_404() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(format!("{}/{}", API_PATH_USERS, Uuid::nil().to_string()).as_str());
 
-    let actual = client.get(url).send().await.unwrap();
+    let token = login_as_admin(&client, &sut).await;
 
-    assert_eq!(actual.status(), StatusCode::NOT_FOUND);
+    let res = client
+        .get(sut.build_path(format!("{}/{}", API_PATH_USERS, Uuid::nil()).as_str()))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+// --- delete ---
+
+#[tokio::test]
+async fn delete_requires_auth() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "delete_no_auth",
+            "email": "delete_no_auth@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let user = create_res.json::<UserResponse>().await.unwrap();
+
+    let res = client
+        .delete(sut.build_path(format!("{}/{}", API_PATH_USERS, user.uuid).as_str()))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn delete_forbidden_for_other_user() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    // Create user A — the target
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "delete_target",
+            "email": "delete_target@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let target = create_res.json::<UserResponse>().await.unwrap();
+
+    // User B attempts to delete user A
+    let token_b = create_user_and_login(&client, &sut, "delete_intruder").await;
+
+    let res = client
+        .delete(sut.build_path(format!("{}/{}", API_PATH_USERS, target.uuid).as_str()))
+        .bearer_auth(&token_b)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
 async fn delete_user_by_uuid_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(API_PATH_USERS);
 
-    let expected_username = "test_delete_user_by_uuid_succeeds";
-    let expected_email = "test_delete_user_by_uuid_succeeds@test.com";
-
-    let expected = json!({
-        "username": expected_username,
-        "email": expected_email,
-        "password": "test"
-    });
-
+    // Create the user and log in as them
     let create_res = client
-        .post(url.clone())
-        .json(&expected)
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "delete_self",
+            "email": "delete_self@test.com",
+            "password": "test_password"
+        }))
         .send()
         .await
         .unwrap();
-
     assert_eq!(create_res.status(), StatusCode::CREATED);
-
     let user = create_res.json::<UserResponse>().await.unwrap();
-    let expected_uuid = user.uuid;
 
-    let delete_by_id_url = sut.build_path(format!("{}/{}", API_PATH_USERS, expected_uuid).as_str());
+    let login_res = client
+        .post(sut.build_path(crate::common::constants::API_PATH_LOGIN))
+        .json(&json!({ "username": "delete_self", "password": "test_password" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(login_res.status(), StatusCode::OK);
+    let body: serde_json::Value = login_res.json().await.unwrap();
+    let token = body["access_token"].as_str().unwrap().to_string();
 
-    let res = client.delete(delete_by_id_url).send().await.unwrap();
+    // Delete own account
+    let delete_res = client
+        .delete(sut.build_path(format!("{}/{}", API_PATH_USERS, user.uuid).as_str()))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(delete_res.status(), StatusCode::OK);
+    let deleted_uuid = delete_res.json::<String>().await.unwrap();
+    assert_eq!(deleted_uuid, user.uuid.to_string());
 
-    assert_eq!(res.status(), StatusCode::OK);
-
-    let deleted_uuid = res.json::<String>().await.unwrap();
-
-    assert_eq!(deleted_uuid, expected_uuid.to_string());
-
-    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_USERS, expected_uuid).as_str());
-    let get_deleted_res = client.get(get_by_id_url).send().await.unwrap();
-
-    assert_eq!(get_deleted_res.status(), StatusCode::NOT_FOUND);
+    // Token is still valid (JWT not revoked), but the record is soft-deleted — expect 404
+    let get_res = client
+        .get(sut.build_path(format!("{}/{}", API_PATH_USERS, user.uuid).as_str()))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(get_res.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn delete_user_by_uuid_404() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(format!("{}/{}", API_PATH_USERS, Uuid::nil().to_string()).as_str());
 
-    let actual = client.delete(url).send().await.unwrap();
+    let token = login_as_admin(&client, &sut).await;
 
-    assert_eq!(actual.status(), StatusCode::NOT_FOUND);
+    let res = client
+        .delete(sut.build_path(format!("{}/{}", API_PATH_USERS, Uuid::nil()).as_str()))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+// --- update_password ---
+
+#[tokio::test]
+async fn update_password_requires_auth() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "update_pw_no_auth",
+            "email": "update_pw_no_auth@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let user = create_res.json::<UserResponse>().await.unwrap();
+
+    let res = client
+        .put(sut.build_path(format!("{}/{}/password", API_PATH_USERS, user.uuid).as_str()))
+        .json(&json!({ "password": "new_password" }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn update_password_forbidden_for_other_user() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    // Create user A — the target
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "update_pw_target",
+            "email": "update_pw_target@test.com",
+            "password": "test"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let target = create_res.json::<UserResponse>().await.unwrap();
+
+    // User B attempts to change user A's password
+    let token_b = create_user_and_login(&client, &sut, "update_pw_intruder").await;
+
+    let res = client
+        .put(sut.build_path(format!("{}/{}/password", API_PATH_USERS, target.uuid).as_str()))
+        .bearer_auth(&token_b)
+        .json(&json!({ "password": "hacked" }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
 async fn update_password_200() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(API_PATH_USERS);
-
-    let expected_username = "update_password_200";
-    let expected_email = "update_password_200@test.com";
-
-    let expected = json!({
-        "username": expected_username,
-        "email": expected_email,
-        "password": "test"
-    });
 
     let create_res = client
-        .post(url.clone())
-        .json(&expected)
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "update_pw_self",
+            "email": "update_pw_self@test.com",
+            "password": "test_password"
+        }))
         .send()
         .await
         .unwrap();
-
     assert_eq!(create_res.status(), StatusCode::CREATED);
-
     let user = create_res.json::<UserResponse>().await.unwrap();
-    let expected_uuid = user.uuid;
 
-    let update_password_url =
-        sut.build_path(format!("{}/{}/password", API_PATH_USERS, expected_uuid).as_str());
+    let login_res = client
+        .post(sut.build_path(crate::common::constants::API_PATH_LOGIN))
+        .json(&json!({ "username": "update_pw_self", "password": "test_password" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(login_res.status(), StatusCode::OK);
+    let body: serde_json::Value = login_res.json().await.unwrap();
+    let token = body["access_token"].as_str().unwrap().to_string();
 
-    let update_password_payload = json!({"password": "updated"});
     let res = client
-        .put(update_password_url)
-        .json(&update_password_payload)
+        .put(sut.build_path(format!("{}/{}/password", API_PATH_USERS, user.uuid).as_str()))
+        .bearer_auth(&token)
+        .json(&json!({ "password": "updated" }))
         .send()
         .await
         .unwrap();
@@ -252,13 +483,33 @@ async fn update_password_422() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let update_password_url =
-        sut.build_path(format!("{}/{}/password", API_PATH_USERS, Uuid::now_v7()).as_str());
+    // Auth is required before payload is parsed, so we need a valid token
+    let create_res = client
+        .post(sut.build_path(API_PATH_USERS))
+        .json(&json!({
+            "username": "update_pw_422",
+            "email": "update_pw_422@test.com",
+            "password": "test_password"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(create_res.status(), StatusCode::CREATED);
+    let user = create_res.json::<UserResponse>().await.unwrap();
 
-    let update_password_payload = json!({"password": null});
+    let login_res = client
+        .post(sut.build_path(crate::common::constants::API_PATH_LOGIN))
+        .json(&json!({ "username": "update_pw_422", "password": "test_password" }))
+        .send()
+        .await
+        .unwrap();
+    let body: serde_json::Value = login_res.json().await.unwrap();
+    let token = body["access_token"].as_str().unwrap().to_string();
+
     let res = client
-        .put(update_password_url)
-        .json(&update_password_payload)
+        .put(sut.build_path(format!("{}/{}/password", API_PATH_USERS, user.uuid).as_str()))
+        .bearer_auth(&token)
+        .json(&json!({ "password": null }))
         .send()
         .await
         .unwrap();
@@ -270,11 +521,16 @@ async fn update_password_422() {
 async fn update_password_404() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
-    let url = sut.build_path(format!("{}/{}/password", API_PATH_USERS, Uuid::nil()).as_str());
 
-    let input = json!({"password": "doesn't matter"});
+    let token = login_as_admin(&client, &sut).await;
 
-    let actual = client.put(url).json(&input).send().await.unwrap();
+    let res = client
+        .put(sut.build_path(format!("{}/{}/password", API_PATH_USERS, Uuid::nil()).as_str()))
+        .bearer_auth(&token)
+        .json(&json!({ "password": "doesn't matter" }))
+        .send()
+        .await
+        .unwrap();
 
-    assert_eq!(actual.status(), StatusCode::NOT_FOUND);
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }

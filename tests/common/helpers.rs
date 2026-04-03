@@ -38,6 +38,19 @@ pub async fn create_user_and_login(
     body["access_token"].as_str().unwrap().to_string()
 }
 
+pub async fn login_as_admin(client: &reqwest::Client, sut: &TestApp) -> String {
+    let login = client
+        .post(sut.build_path(API_PATH_LOGIN))
+        .json(&json!({ "username": "admin", "password": "pass1234" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(login.status(), StatusCode::OK);
+
+    let body: serde_json::Value = login.json().await.unwrap();
+    body["access_token"].as_str().unwrap().to_string()
+}
+
 pub fn pick_error_fields<'a>(
     err: &'a ApiError,
     details_code: &'a str,
