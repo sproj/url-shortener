@@ -38,6 +38,22 @@ pub async fn get_by_uuid(db_pool: &Pool, uuid: Uuid) -> Result<Option<ShortUrl>,
         .map_err(ShortUrlError::Storage)
 }
 
+/// Like `get_by_uuid` but enforces that the caller either owns the URL or is an admin.
+/// Anonymous short URLs (no `user_id`) are accessible by admins only.
+pub async fn get_by_uuid_for_user(
+    db_pool: &Pool,
+    uuid: Uuid,
+    user_uuid: Uuid,
+    is_admin: bool,
+) -> Result<Option<ShortUrl>, ShortUrlError> {
+    let short = match get_by_uuid(db_pool, uuid).await? {
+        None => return Ok(None),
+        Some(s) => s,
+    };
+    require_owner_or_admin(db_pool, &short, user_uuid, is_admin).await?;
+    Ok(Some(short))
+}
+
 pub async fn get_by_code(db_pool: &Pool, code: &str) -> Result<Option<ShortUrl>, DatabaseError> {
     repository::get_by_code(db_pool, code).await
 }
@@ -46,12 +62,16 @@ pub async fn delete_one_by_uuid(
     db_pool: &Pool,
     redirect_cache: Arc<dyn RedirectCache>,
     uuid: Uuid,
+    user_uuid: Uuid,
+    is_admin: bool,
 ) -> Result<bool, ShortUrlError> {
     let rec = match repository::get_by_uuid(db_pool, uuid).await {
         Ok(Some(short)) => short,
         Ok(None) => return Err(ShortUrlError::NotFound(uuid.to_string())),
         Err(e) => return Err(ShortUrlError::from(e)),
     };
+
+    require_owner_or_admin(db_pool, &rec, user_uuid, is_admin).await?;
 
     let deleted_code = rec.code;
 
@@ -66,6 +86,33 @@ pub async fn delete_one_by_uuid(
             Ok(delete_result)
         }
     }
+}
+
+/// Asserts that `user_uuid` owns `short` or is an admin.
+/// Anonymous short URLs (no `user_id`) are accessible by admins only.
+async fn require_owner_or_admin(
+    db_pool: &Pool,
+    short: &ShortUrl,
+    user_uuid: Uuid,
+    is_admin: bool,
+) -> Result<(), ShortUrlError> {
+    if is_admin {
+        return Ok(());
+    }
+
+    let owner_db_id = match short.user_id {
+        Some(id) => id,
+        None => return Err(ShortUrlError::Unauthorized(AuthError::Forbidden)),
+    };
+
+    if users_repository::get_user_by_uuid(db_pool, user_uuid)
+        .await?
+        .is_none_or(|user| user.id != owner_db_id)
+    {
+        return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
+    }
+
+    Ok(())
 }
 
 pub async fn add_generated_code(

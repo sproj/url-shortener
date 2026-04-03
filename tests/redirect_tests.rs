@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::common::{
     constants::{API_PATH_REDIRECT, API_PATH_SHORTEN},
+    helpers::login_as_admin,
     test_app, test_redis,
 };
 
@@ -197,7 +198,23 @@ async fn deleting_short_url_invalidates_cached_redirect() {
         .await;
     let client = no_redirect_client();
 
-    let short = create_short_url(&client, &sut, "http://delete-invalidates-cache.me", None).await;
+    let token = login_as_admin(&client, &sut).await;
+
+    let input = serde_json::json!({
+        "long_url": "http://delete-invalidates-cache.me",
+        "expires_at": null,
+    });
+
+    let create = client
+        .post(sut.build_path(API_PATH_SHORTEN))
+        .json(&input)
+        .bearer_auth(token.clone())
+        .send()
+        .await
+        .unwrap();
+
+    let short: CreateShortUrlResponse = create.json().await.unwrap();
+
     let redirect_url = sut.build_path(format!("{}/{}", API_PATH_REDIRECT, &short.code).as_str());
 
     let first = client.get(redirect_url.clone()).send().await.unwrap();
@@ -208,6 +225,7 @@ async fn deleting_short_url_invalidates_cached_redirect() {
 
     let delete = client
         .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, short.uuid).as_str()))
+        .bearer_auth(token)
         .send()
         .await
         .unwrap();

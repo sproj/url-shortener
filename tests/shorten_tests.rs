@@ -1,4 +1,8 @@
-use crate::common::{constants::API_PATH_SHORTEN, helpers::pick_error_fields, test_app};
+use crate::common::{
+    constants::API_PATH_SHORTEN,
+    helpers::{login_as_admin, pick_error_fields},
+    test_app,
+};
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
 use url_shortener::{
@@ -52,9 +56,16 @@ async fn get_after_create_shorturl_succeeds() {
     assert_eq!(create.status(), StatusCode::CREATED);
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
 
+    // Anonymous short URLs are owned by nobody — only admin can read their metadata
+    let token = login_as_admin(&client, &sut).await;
     let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str());
 
-    let read = client.get(get_by_id_url).send().await.unwrap();
+    let read = client
+        .get(get_by_id_url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(read.status(), StatusCode::OK);
 
@@ -87,7 +98,13 @@ async fn get_all_succeeds() {
 
     let expected_uuid = create.json::<CreateShortUrlResponse>().await.unwrap().uuid;
 
-    let read_all = client.get(create_url).send().await.unwrap();
+    let token = login_as_admin(&client, &sut).await;
+    let read_all = client
+        .get(create_url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(read_all.status(), StatusCode::OK);
 
@@ -317,7 +334,14 @@ async fn delete_shorturl_by_id_succeeds() {
     let url_with_id_path_param =
         sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str());
 
-    let delete = client.delete(url_with_id_path_param).send().await.unwrap();
+    // Anonymous short URLs have no owner — only admin can delete them
+    let token = login_as_admin(&client, &sut).await;
+    let delete = client
+        .delete(url_with_id_path_param)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(delete.status(), StatusCode::OK);
 
@@ -330,10 +354,11 @@ async fn get_shorturl_by_nosuch_id_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
+    let token = login_as_admin(&client, &sut).await;
     let no_such_id = Uuid::nil();
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
 
-    let res = client.get(url).send().await.unwrap();
+    let res = client.get(url).bearer_auth(&token).send().await.unwrap();
     let status = res.status();
     let err: ApiError = res.json().await.unwrap();
 
@@ -346,10 +371,11 @@ async fn delete_shorturl_by_nosuch_id_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
+    let token = login_as_admin(&client, &sut).await;
     let no_such_id = Uuid::nil();
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
 
-    let res = client.delete(url).send().await.unwrap();
+    let res = client.delete(url).bearer_auth(&token).send().await.unwrap();
 
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }

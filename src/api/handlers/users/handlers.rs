@@ -14,10 +14,7 @@ use crate::{
         },
     },
     application::{
-        security::{
-            auth_error::AuthError,
-            jwt::{AccessClaims, ClaimsMethods},
-        },
+        security::jwt::{AccessClaims, ClaimsMethods},
         service::user::{create_user_params::CreateUserParams, user_service},
         state::SharedState,
     },
@@ -38,7 +35,7 @@ pub async fn get_one_by_uuid(
     Path(subject_uuid): Path<Uuid>,
     access_claims: AccessClaims,
 ) -> Result<Json<UserResponse>, ApiError> {
-    user_is_requestor_or_admin(access_claims, subject_uuid)?;
+    access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
     tracing::debug!(%subject_uuid, "get user by uuid");
     match user_service::get_one_by_uuid(&state.db_pool, subject_uuid).await? {
@@ -57,7 +54,7 @@ pub async fn delete_one_by_uuid(
     Path(subject_uuid): Path<Uuid>,
     access_claims: AccessClaims,
 ) -> Result<Json<String>, ApiError> {
-    user_is_requestor_or_admin(access_claims, subject_uuid)?;
+    access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
     user_service::delete_one_by_uuid(&state.db_pool, subject_uuid).await?;
     tracing::debug!(%subject_uuid, "user deleted");
@@ -73,7 +70,7 @@ pub async fn update_password(
     let Json(parsed_input) =
         req_payload.map_err(|e| UserError::UnprocessableInput(e.to_string()))?;
 
-    user_is_requestor_or_admin(access_claims, subject_uuid)?;
+    access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
     if user_service::update_password_by_uuid(&state.db_pool, parsed_input.password, subject_uuid)
         .await?
@@ -99,23 +96,4 @@ pub async fn create_user(
     let res = created.into();
 
     Ok((StatusCode::CREATED, Json(res)))
-}
-
-fn user_is_requestor_or_admin(
-    access_claims: AccessClaims,
-    subject_uuid: Uuid,
-) -> Result<(), AuthError> {
-    let requestor_uuid = Uuid::parse_str(&access_claims.sub).map_err(|e| {
-        tracing::warn!(%e, "failed to parse sub from access claims");
-        AuthError::InvalidToken
-    })?;
-
-    if requestor_uuid != subject_uuid {
-        let is_admin = access_claims.validate_role_admin().is_ok();
-        if !is_admin {
-            tracing::warn!(%requestor_uuid, %subject_uuid, "non-admin requestor attempting to operate on a user other than themselves");
-            return Err(AuthError::Forbidden);
-        }
-    }
-    Ok(())
 }

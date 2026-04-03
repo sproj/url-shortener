@@ -85,7 +85,7 @@ impl From<&ShortUrlError> for ApiError {
                 ApiError::new(e).kind(ApiErrorKind::Conflict).message(e)
             }
             ShortUrlError::Unauthorized(e) => {
-                tracing::warn!("acton on short url attempted which failed authorization check");
+                tracing::warn!("action on short url attempted which failed authorization check");
                 ApiError::new(e.to_string()).kind(ApiErrorKind::Forbidden)
             }
         }

@@ -197,6 +197,7 @@ async fn vanity_url_is_associated_with_creating_user() {
 
     let get = client
         .get(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .bearer_auth(&token)
         .send()
         .await
         .unwrap();
