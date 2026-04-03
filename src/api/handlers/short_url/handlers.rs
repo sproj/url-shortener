@@ -14,25 +14,38 @@ use crate::{
         },
     },
     application::{
-        security::{auth_error::AuthError, jwt::AccessClaims},
+        security::{
+            auth_error::AuthError,
+            jwt::{AccessClaims, ClaimsMethods},
+        },
         service::short_url::short_url_service,
         state::SharedState,
     },
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
 };
 
-pub async fn get_all(State(state): State<SharedState>) -> Result<Json<Vec<ShortUrl>>, ApiError> {
+pub async fn get_all(
+    access_claims: AccessClaims,
+    State(state): State<SharedState>,
+) -> Result<Json<Vec<ShortUrl>>, ApiError> {
+    access_claims.validate_role_admin()?;
     let short_urls = short_url_service::get_all(&state.db_pool).await?;
     tracing::debug!(?short_urls, "get all ok");
     Ok(Json(short_urls))
 }
 
 pub async fn get_one_by_uuid(
+    access_claims: AccessClaims,
     State(state): State<SharedState>,
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<ShortUrl>, ApiError> {
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
+    let is_admin = access_claims.validate_role_admin().is_ok();
+
     tracing::debug!(%uuid, "get one by uuid");
-    if let Some(short) = short_url_service::get_by_uuid(&state.db_pool, uuid).await? {
+    if let Some(short) =
+        short_url_service::get_by_uuid_for_user(&state.db_pool, uuid, user_uuid, is_admin).await?
+    {
         tracing::debug!(?short, "ok");
         Ok(Json(short))
     } else {
@@ -41,17 +54,33 @@ pub async fn get_one_by_uuid(
     }
 }
 
+// Note: this handler is not currently registered in any route. Auth is added here for
+// consistency so it is ready when the route is wired up.
 pub async fn get_one_by_code(
+    access_claims: AccessClaims,
     State(state): State<SharedState>,
     Path(code): Path<String>,
 ) -> Result<Json<ShortUrl>, ApiError> {
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
+    let is_admin = access_claims.validate_role_admin().is_ok();
+
     tracing::debug!(%code, "get one by code");
-    if let Some(short) = short_url_service::get_by_code(&state.db_pool, &code).await? {
-        tracing::debug!(%short, "ok");
-        Ok(Json(short))
-    } else {
-        tracing::warn!(%code, "not found");
-        Err(ApiError::from(ShortUrlError::NotFound(code)))
+    match short_url_service::get_by_code(&state.db_pool, &code).await? {
+        None => {
+            tracing::warn!(%code, "not found");
+            Err(ApiError::from(ShortUrlError::NotFound(code)))
+        }
+        Some(short) => {
+            short_url_service::get_by_uuid_for_user(
+                &state.db_pool,
+                short.uuid,
+                user_uuid,
+                is_admin,
+            )
+            .await?;
+            tracing::debug!(%short, "ok");
+            Ok(Json(short))
+        }
     }
 }
 
@@ -140,11 +169,21 @@ pub async fn update_one_by_uuid(
 }
 
 pub async fn delete_one_by_uuid(
+    access_claims: AccessClaims,
     State(state): State<SharedState>,
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<String>, ApiError> {
-    if short_url_service::delete_one_by_uuid(&state.db_pool, state.redirect_cache.clone(), uuid)
-        .await?
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
+    let is_admin = access_claims.validate_role_admin().is_ok();
+
+    if short_url_service::delete_one_by_uuid(
+        &state.db_pool,
+        state.redirect_cache.clone(),
+        uuid,
+        user_uuid,
+        is_admin,
+    )
+    .await?
     {
         tracing::debug!(%uuid, "ok");
         Ok(Json(uuid.to_string()))

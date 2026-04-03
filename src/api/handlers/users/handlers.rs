@@ -14,6 +14,7 @@ use crate::{
         },
     },
     application::{
+        security::jwt::{AccessClaims, ClaimsMethods},
         service::user::{create_user_params::CreateUserParams, user_service},
         state::SharedState,
     },
@@ -22,46 +23,63 @@ use crate::{
 
 pub async fn get_all(
     State(state): State<SharedState>,
+    access_claims: AccessClaims,
 ) -> Result<Json<Vec<UserResponse>>, ApiError> {
+    access_claims.validate_role_admin()?;
     let users = user_service::list_all(&state.db_pool).await?;
     Ok(Json(users.into_iter().map(UserResponse::from).collect()))
 }
 
 pub async fn get_one_by_uuid(
     State(state): State<SharedState>,
-    Path(uuid): Path<Uuid>,
+    Path(subject_uuid): Path<Uuid>,
+    access_claims: AccessClaims,
 ) -> Result<Json<UserResponse>, ApiError> {
-    tracing::debug!(%uuid, "get user by uuid");
-    match user_service::get_one_by_uuid(&state.db_pool, uuid).await? {
+    access_claims.assert_is_subject_or_admin(subject_uuid)?;
+
+    tracing::debug!(%subject_uuid, "get user by uuid");
+    match user_service::get_one_by_uuid(&state.db_pool, subject_uuid).await? {
         Some(user) => Ok(Json(user.into())),
         None => {
-            tracing::warn!(%uuid, "user not found");
-            Err(ApiError::from(UserError::NotFound(uuid.to_string())))
+            tracing::warn!(%subject_uuid, "user not found");
+            Err(ApiError::from(UserError::NotFound(
+                subject_uuid.to_string(),
+            )))
         }
     }
 }
 
 pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
-    Path(uuid): Path<Uuid>,
+    Path(subject_uuid): Path<Uuid>,
+    access_claims: AccessClaims,
 ) -> Result<Json<String>, ApiError> {
-    user_service::delete_one_by_uuid(&state.db_pool, uuid).await?;
-    tracing::debug!(%uuid, "user deleted");
-    Ok(Json(uuid.to_string()))
+    access_claims.assert_is_subject_or_admin(subject_uuid)?;
+
+    user_service::delete_one_by_uuid(&state.db_pool, subject_uuid).await?;
+    tracing::debug!(%subject_uuid, "user deleted");
+    Ok(Json(subject_uuid.to_string()))
 }
 
 pub async fn update_password(
     State(state): State<SharedState>,
-    Path(uuid): Path<Uuid>,
+    Path(subject_uuid): Path<Uuid>,
+    access_claims: AccessClaims,
     req_payload: Result<Json<UpdatePasswordRequest>, JsonRejection>,
 ) -> Result<StatusCode, ApiError> {
     let Json(parsed_input) =
         req_payload.map_err(|e| UserError::UnprocessableInput(e.to_string()))?;
 
-    if user_service::update_password_by_uuid(&state.db_pool, parsed_input.password, uuid).await? {
+    access_claims.assert_is_subject_or_admin(subject_uuid)?;
+
+    if user_service::update_password_by_uuid(&state.db_pool, parsed_input.password, subject_uuid)
+        .await?
+    {
         Ok(StatusCode::OK)
     } else {
-        Err(ApiError::from(UserError::NotFound(uuid.to_string())))
+        Err(ApiError::from(UserError::NotFound(
+            subject_uuid.to_string(),
+        )))
     }
 }
 

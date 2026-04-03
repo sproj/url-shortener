@@ -114,6 +114,27 @@ pub trait ClaimsMethods {
     fn get_typ(&self) -> u8;
 }
 
+impl AccessClaims {
+    /// Returns `Ok(())` if the requesting user is either the identified subject or an admin.
+    /// The subject is identified by `subject_uuid`; the requestor is read from `self.sub`.
+    pub fn assert_is_subject_or_admin(&self, subject_uuid: uuid::Uuid) -> Result<(), AuthError> {
+        let requestor_uuid = uuid::Uuid::parse_str(&self.sub).map_err(|e| {
+            tracing::warn!(%e, "failed to parse sub from access claims");
+            AuthError::InvalidToken
+        })?;
+
+        if requestor_uuid != subject_uuid && self.validate_role_admin().is_err() {
+            tracing::warn!(
+                %requestor_uuid,
+                %subject_uuid,
+                "non-admin requestor attempting to operate on a resource they do not own"
+            );
+            return Err(AuthError::Forbidden);
+        }
+        Ok(())
+    }
+}
+
 impl ClaimsMethods for AccessClaims {
     const EXPECTED_TYPE: JwtTokenType = JwtTokenType::AccessToken;
     fn validate_role_admin(&self) -> Result<(), AuthError> {

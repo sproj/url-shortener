@@ -5,39 +5,12 @@ use url_shortener::{
 };
 
 use crate::common::{
-    constants::{
-        API_PATH_LOGIN, API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_USERS, API_PATH_VANITY,
-    },
+    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_VANITY},
+    helpers::create_user_and_login,
     test_app::TestApp,
 };
 
 pub mod common;
-
-async fn create_user_and_login(client: &reqwest::Client, sut: &TestApp, username: &str) -> String {
-    let password = "test_password";
-    let create = client
-        .post(sut.build_path(API_PATH_USERS))
-        .json(&json!({
-            "username": username,
-            "email": format!("{}@vanity.test", username),
-            "password": password,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(create.status(), StatusCode::CREATED);
-
-    let login = client
-        .post(sut.build_path(API_PATH_LOGIN))
-        .json(&json!({ "username": username, "password": password }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(login.status(), StatusCode::OK);
-
-    let body: serde_json::Value = login.json().await.unwrap();
-    body["access_token"].as_str().unwrap().to_string()
-}
 
 #[tokio::test]
 async fn create_vanity_url_succeeds() {
@@ -224,6 +197,7 @@ async fn vanity_url_is_associated_with_creating_user() {
 
     let get = client
         .get(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .bearer_auth(&token)
         .send()
         .await
         .unwrap();

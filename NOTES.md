@@ -1,4 +1,4 @@
-# URL Shortener - Current Notes - 1 April 2026
+# URL Shortener - Current Notes - 3 April 2026
 
 ## Current snapshot
 
@@ -7,10 +7,15 @@ Completed and working:
 - Public `short_url` API is UUID-based; DB `id` is not exposed.
 - Short URL HTTP surface currently includes:
   - `POST /shorten`
+  - `POST /shorten/vanity`
   - `GET /shorten`
   - `GET /shorten/{uuid}`
+  - `PATCH /shorten/{uuid}`
   - `DELETE /shorten/{uuid}`
   - redirect path `/r/{code}`
+- Vanity URL creation is implemented and integration-tested.
+- Vanity URL update is implemented and integration-tested.
+- Ownership checks are now present for updating owned short URLs.
 - Redirect behavior is implemented and integration-tested:
   - `301` / `308` for permanent redirects
   - `302` / `307` for temporary redirects
@@ -47,6 +52,7 @@ Completed and working:
 - Logout flow is implemented:
   - cached refresh token is revoked
 - Access/refresh token type validation is enforced in extractors.
+- Authenticated user context is now used by vanity URL create/update flows.
 
 ## Test picture
 
@@ -59,12 +65,15 @@ Green suites present:
 - `retry_on_conflict_test`
 - `users_tests`
 - `auth_tests`
+- `vanity_tests`
+- `update_tests`
 - `error_tests`
 
 Coverage/testing status:
 
 - redirect/cache behavior is covered well
 - login, logout, and refresh flows are integration-tested
+- vanity creation/update flows are integration-tested
 - startup/config/database/redis error paths have focused unit tests
 - shared integration-test helper noise from `dead_code` was intentionally allowed in `tests/common`
 
@@ -78,19 +87,14 @@ Coverage/testing status:
 
 ## Immediate next focus
 
-1. Add protected routes using the existing access-token extractor foundation.
-2. Decide and implement ownership enforcement for user-owned short URLs.
-3. Add vanity URL support.
-4. Define collision/conflict policy for vanity codes:
-   - global uniqueness
+1. Extend protected-route behavior beyond vanity URL create/update.
+2. Decide the remaining ownership rules for read/delete/list flows on owned short URLs.
+3. Revisit vanity code policy details:
    - reserved values
-   - ownership rules
-   - update/delete behavior
-5. Add tests for:
-   - protected route requires valid access token
-   - wrong token type on protected route
-   - user cannot mutate another user's owned short URL
-   - vanity code conflict returns expected error
+   - update semantics
+   - delete/reuse semantics
+   - any admin override behavior
+4. Add protected-route coverage for the next authenticated feature beyond vanity URLs.
 
 ## Secondary follow-up
 
