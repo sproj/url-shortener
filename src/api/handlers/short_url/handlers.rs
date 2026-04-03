@@ -9,9 +9,8 @@ use crate::{
     api::{
         error::ApiError,
         handlers::short_url::{
-            CreateVanityUrlRequest, ValidatedCreateShortUrlRequest,
-            create_short_url_request::CreateShortUrlRequest,
-            create_short_url_response::CreateShortUrlResponse,
+            CreateShortUrlRequest, CreateShortUrlResponse, CreateVanityUrlRequest,
+            UpdateShortUrlRequest, ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
         },
     },
     application::{
@@ -110,6 +109,34 @@ pub async fn create_vanity_url(
     tracing::debug!(%payload, "ok");
 
     Ok((StatusCode::CREATED, Json(payload)))
+}
+
+pub async fn update_one_by_uuid(
+    Path(uuid): Path<Uuid>,
+    access_claims: AccessClaims,
+    State(state): State<SharedState>,
+    req_payload: Result<Json<UpdateShortUrlRequest>, JsonRejection>,
+) -> Result<Json<CreateShortUrlResponse>, ApiError> {
+    let Json(parsed_input) =
+        req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
+
+    let dto: ValidatedUpdateShortUrlRequest = parsed_input.try_into()?;
+
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|e| {
+        tracing::warn!(%e, "failed to parse a sub to a uuid from a parsed access token");
+        AuthError::InvalidToken
+    })?;
+    let updated = short_url_service::update_one_by_uuid(
+        uuid,
+        user_uuid,
+        dto,
+        &state.db_pool,
+        state.redirect_cache.clone(),
+    )
+    .await?;
+
+    let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(updated);
+    Ok(Json(payload))
 }
 
 pub async fn delete_one_by_uuid(

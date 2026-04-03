@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::{
     api::error::{ApiError, ApiErrorKind},
+    application::security::auth_error::AuthError,
     domain::validation_issue::ValidationIssue,
     infrastructure::{database::database_error::DatabaseError, redis::cache_error::CacheError},
 };
@@ -23,6 +24,8 @@ pub enum ShortUrlError {
     Cache(#[from] CacheError),
     #[error("conflict on code creation {0}")]
     Conflict(String),
+    #[error("unauthorized short url action {0}")]
+    Unauthorized(#[from] AuthError),
 }
 
 impl From<DatabaseError> for ShortUrlError {
@@ -80,6 +83,10 @@ impl From<&ShortUrlError> for ApiError {
             ShortUrlError::Conflict(e) => {
                 tracing::error!("conflict on attempted vanity url creation");
                 ApiError::new(e).kind(ApiErrorKind::Conflict).message(e)
+            }
+            ShortUrlError::Unauthorized(e) => {
+                tracing::warn!("acton on short url attempted which failed authorization check");
+                ApiError::new(e.to_string()).kind(ApiErrorKind::Forbidden)
             }
         }
     }
