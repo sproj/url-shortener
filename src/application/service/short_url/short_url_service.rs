@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    api::handlers::short_url::ValidatedCreateShortUrlRequest,
+    api::handlers::short_url::{ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest},
     application::{
         repository::{short_url_repository as repository, users_repository},
+        security::auth_error::AuthError,
         service::short_url::{
             ShortUrlSpec, code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
         },
@@ -185,6 +186,57 @@ pub async fn add_vanity_url(
             Err(ShortUrlError::Storage(e))
         }
     }
+}
+
+pub async fn update_one_by_uuid(
+    short_uuid: Uuid,
+    user_uuid: Uuid,
+    dto: ValidatedUpdateShortUrlRequest,
+    db_pool: &Pool,
+    redirect_cache: Arc<dyn RedirectCache>,
+) -> Result<ShortUrl, ShortUrlError> {
+    let short = match repository::get_by_uuid(db_pool, short_uuid).await? {
+        None => {
+            return Err(ShortUrlError::NotFound(
+                format!("short url with {short_uuid} not found").to_string(),
+            ));
+        }
+        Some(short) => short,
+    };
+
+    let old_code = short.code.clone();
+
+    if users_repository::get_user_by_uuid(db_pool, user_uuid)
+        .await?
+        .is_none_or(|user| user.id != short.id)
+    {
+        return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
+    }
+
+    let spec = ShortUrlSpec {
+        uuid: short.uuid,
+        user_id: short.user_id,
+        long_url: match dto.long_url {
+            Some(new_target) => new_target,
+            None => short.long_url,
+        },
+        expires_at: match dto.expires_at {
+            Some(new_expiry) => Some(new_expiry),
+            None => short.expires_at,
+        },
+        code: match dto.code {
+            Some(new_code) => new_code,
+            None => short.code,
+        },
+    };
+
+    let update_result = repository::update_one_by_uuid(db_pool, spec)
+        .await
+        .map_err(ShortUrlError::Storage)?;
+
+    redirect_cache.delete(&old_code).await?;
+
+    Ok(update_result)
 }
 
 pub async fn resolve_redirect_decision(

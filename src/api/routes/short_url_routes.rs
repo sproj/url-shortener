@@ -1,11 +1,12 @@
 use axum::{
     Router,
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
 };
 
 use crate::{
     api::handlers::short_url::{
         create_short_url, create_vanity_url, delete_one_by_uuid, get_all, get_one_by_uuid,
+        update_one_by_uuid,
     },
     application::state::SharedState,
 };
@@ -17,4 +18,5 @@ pub fn routes() -> Router<SharedState> {
         .route("/", post(create_short_url))
         .route("/{uuid}", get(get_one_by_uuid))
         .route("/{uuid}", delete(delete_one_by_uuid))
+        .route("/{uuid}", patch(update_one_by_uuid))
 }
