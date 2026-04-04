@@ -3,12 +3,10 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    api::handlers::short_url::{
-        ValidatedCreateShortUrlRequest,
-        input_validation_rules::{
-            url_cannot_expire_in_the_past, validate_url_input, validate_vanity_code,
-        },
+    api::handlers::short_url::input_validation_rules::{
+        url_cannot_expire_in_the_past, validate_url_input, validate_vanity_code,
     },
+    application::service::short_url::ValidatedCreateShortUrlRequest,
     domain::{errors::ShortUrlError, validation_issue::ValidationIssue},
 };
 

@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    api::handlers::short_url::{ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest},
     application::{
         repository::{short_url_repository as repository, users_repository},
         security::auth_error::AuthError,
         service::short_url::{
-            ShortUrlSpec, code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
+            ShortUrlSpec, ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
+            code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
         },
     },
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},

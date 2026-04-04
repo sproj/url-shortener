@@ -10,7 +10,7 @@ use crate::{
         error::ApiError,
         handlers::short_url::{
             CreateShortUrlRequest, CreateShortUrlResponse, CreateVanityUrlRequest,
-            UpdateShortUrlRequest, ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
+            UpdateShortUrlRequest,
         },
     },
     application::{
@@ -18,7 +18,9 @@ use crate::{
             auth_error::AuthError,
             jwt::{AccessClaims, ClaimsMethods},
         },
-        service::short_url::short_url_service,
+        service::short_url::{
+            ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest, short_url_service,
+        },
         state::SharedState,
     },
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
