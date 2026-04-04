@@ -10,11 +10,11 @@ use crate::{
         repository::{short_url_repository as repository, users_repository},
         security::auth_error::AuthError,
         service::short_url::{
-            ShortUrlSpec, ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
+            ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
             code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
         },
     },
-    domain::{errors::ShortUrlError, models::short_url::ShortUrl},
+    domain::{errors::ShortUrlError, models::short_url::ShortUrl, short_url_spec::ShortUrlSpec},
     infrastructure::database::database_error::DatabaseError,
 };
 

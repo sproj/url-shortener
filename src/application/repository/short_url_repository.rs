@@ -1,6 +1,6 @@
 use crate::{
-    application::{repository::RepositoryResult, service::short_url::ShortUrlSpec},
-    domain::models::short_url::ShortUrl,
+    application::repository::RepositoryResult,
+    domain::{models::short_url::ShortUrl, short_url_spec::ShortUrlSpec},
 };
 use chrono::Utc;
 use deadpool_postgres::{GenericClient, Pool};
