@@ -1,10 +1,19 @@
 use std::sync::Arc;
 
+use crate::application::repository::short_url_repository::PostgresShortUrlRepository;
+use crate::application::repository::users_repository::PostgresUsersRepository;
+use crate::application::service::auth::auth_service::AuthService;
 use crate::application::service::auth::refresh_token_cache::RefreshTokenCache;
-use crate::application::service::auth::refresh_token_cache_trait::NoopRefreshTokenCache;
+use crate::application::service::auth::refresh_token_cache_trait::{
+    NoopRefreshTokenCache, RefreshTokenCacheTrait,
+};
 use crate::application::service::short_url::code_generator::{CodeGenerator, RandomCodeGenerator};
 use crate::application::service::short_url::redirect_cache::RedirectCacheChecker;
-use crate::application::service::short_url::redirect_cache_trait::NoopRedirectCache;
+use crate::application::service::short_url::redirect_cache_trait::{
+    NoopRedirectCache, RedirectCache,
+};
+use crate::application::service::short_url::short_url_service::ShortUrlService;
+use crate::application::service::user::user_service::UsersService;
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppState, SharedState};
 use crate::{api::server, application::config::Config};
@@ -73,24 +82,42 @@ impl AppBuilder {
     }
 
     pub async fn build(self) -> Result<App, StartupError> {
+        let code_generator: Arc<dyn CodeGenerator> = self
+            .code_generator
+            .unwrap_or_else(|| Arc::new(RandomCodeGenerator));
+        let redirect_cache: Arc<dyn RedirectCache> = match &self.redis {
+            Some(conn) => Arc::new(RedirectCacheChecker::new(conn.clone())),
+            None => Arc::new(NoopRedirectCache),
+        };
+        let refresh_token_cache: Arc<dyn RefreshTokenCacheTrait> = match &self.redis {
+            Some(conn) => Arc::new(RefreshTokenCache::new(conn.clone())),
+            None => Arc::new(NoopRefreshTokenCache),
+        };
+        let short_url_repository = Arc::new(PostgresShortUrlRepository::new(self.db_pool.clone()));
+        let users_repository = Arc::new(PostgresUsersRepository::new(self.db_pool.clone()));
+
+        let user_service = Arc::new(UsersService::new(users_repository.clone()));
+
+        let cfg = self.config.clone();
+
         let state = Arc::new(AppState {
-            code_generator: self
-                .code_generator
-                .unwrap_or_else(|| Arc::new(RandomCodeGenerator)),
-            redirect_cache: match &self.redis {
-                Some(conn) => Arc::new(RedirectCacheChecker::new(conn.clone())),
-                None => Arc::new(NoopRedirectCache),
-            },
-            refresh_token_cache: match &self.redis {
-                Some(conn) => Arc::new(RefreshTokenCache::new(conn.clone())),
-                None => Arc::new(NoopRefreshTokenCache),
-            },
-            max_retries: self.config.app.max_retries,
             db_pool: self.db_pool,
-            jwt_decoding_key: self.config.jwt.jwt_keys.decoding.clone(),
-            jwt_encoding_key: self.config.jwt.jwt_keys.encoding.clone(),
-            jwt_access_token_seconds: self.config.jwt.jwt_expire_access_token_seconds,
-            jwt_refresh_token_seconds: self.config.jwt.jwt_expire_refresh_token_seconds,
+            short_url_service: Arc::new(ShortUrlService::new(
+                short_url_repository,
+                users_repository.clone(),
+                redirect_cache,
+                code_generator,
+                cfg.app.max_retries,
+            )),
+            user_service: user_service.clone(),
+            auth_service: Arc::new(AuthService::new(
+                user_service,
+                refresh_token_cache,
+                cfg.jwt.jwt_expire_access_token_seconds,
+                cfg.jwt.jwt_expire_refresh_token_seconds,
+                cfg.jwt.jwt_keys.encoding.clone(),
+            )),
+            jwt_decoding_key: cfg.jwt.jwt_keys.decoding,
         });
         Ok(App {
             config: self.config,

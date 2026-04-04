@@ -320,7 +320,6 @@ async fn login_caches_refresh_token() {
     let expected_cache_key = access_token.jti;
 
     let cached_refresh_claims = sut
-        .state
         .refresh_token_cache
         .get(&expected_cache_key)
         .await
@@ -393,7 +392,6 @@ async fn refresh_cycles_tokens() {
     let initial_expected_cache_key = &initial_access_token.jti;
 
     let initial_cached_refresh_claims = sut
-        .state
         .refresh_token_cache
         .get(initial_expected_cache_key)
         .await
@@ -424,8 +422,7 @@ async fn refresh_cycles_tokens() {
     assert_eq!(refreshed_access_token.jti, refreshed_refresh_token.prf);
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&initial_access_token.jti)
             .await
             .unwrap()
@@ -433,8 +430,7 @@ async fn refresh_cycles_tokens() {
     );
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&refreshed_access_token.jti)
             .await
             .unwrap()
@@ -493,8 +489,7 @@ async fn logout_revokes_cached_refresh_token() {
         decode_token(access_token_res, &sut.state.jwt_decoding_key).unwrap();
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -511,8 +506,7 @@ async fn logout_revokes_cached_refresh_token() {
     assert_eq!(logout_res.status(), StatusCode::OK);
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -626,8 +620,7 @@ async fn logout_with_auth_header_is_idempotent() {
         decode_token(access_token_res, &sut.state.jwt_decoding_key).unwrap();
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -644,8 +637,7 @@ async fn logout_with_auth_header_is_idempotent() {
     assert_eq!(first_logout_call.status(), StatusCode::OK);
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -769,8 +761,7 @@ async fn refresh_with_revoked_token_unauthorized() {
         decode_token(access_token_res, &sut.state.jwt_decoding_key).unwrap();
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -905,8 +896,7 @@ async fn replay_token_refresh_unauthorized() {
         decode_token(initial_access_token_res, &sut.state.jwt_decoding_key).unwrap();
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -927,8 +917,7 @@ async fn replay_token_refresh_unauthorized() {
         decode_token(&refreshed_tokens.access_token, &sut.state.jwt_decoding_key).unwrap();
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&access_token.jti)
             .await
             .unwrap()
@@ -936,8 +925,7 @@ async fn replay_token_refresh_unauthorized() {
     );
 
     assert!(
-        sut.state
-            .refresh_token_cache
+        sut.refresh_token_cache
             .get(&refreshed_access_token.jti)
             .await
             .unwrap()

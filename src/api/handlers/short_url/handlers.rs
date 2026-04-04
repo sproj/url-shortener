@@ -10,7 +10,7 @@ use crate::{
         error::ApiError,
         handlers::short_url::{
             CreateShortUrlRequest, CreateShortUrlResponse, CreateVanityUrlRequest,
-            UpdateShortUrlRequest, ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
+            UpdateShortUrlRequest,
         },
     },
     application::{
@@ -18,7 +18,7 @@ use crate::{
             auth_error::AuthError,
             jwt::{AccessClaims, ClaimsMethods},
         },
-        service::short_url::short_url_service,
+        service::short_url::{ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest},
         state::SharedState,
     },
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
@@ -29,7 +29,7 @@ pub async fn get_all(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<ShortUrl>>, ApiError> {
     access_claims.validate_role_admin()?;
-    let short_urls = short_url_service::get_all(&state.db_pool).await?;
+    let short_urls = state.short_url_service.get_all().await?;
     tracing::debug!(?short_urls, "get all ok");
     Ok(Json(short_urls))
 }
@@ -43,8 +43,10 @@ pub async fn get_one_by_uuid(
     let is_admin = access_claims.validate_role_admin().is_ok();
 
     tracing::debug!(%uuid, "get one by uuid");
-    if let Some(short) =
-        short_url_service::get_by_uuid_for_user(&state.db_pool, uuid, user_uuid, is_admin).await?
+    if let Some(short) = state
+        .short_url_service
+        .get_by_uuid_for_user(uuid, user_uuid, is_admin)
+        .await?
     {
         tracing::debug!(?short, "ok");
         Ok(Json(short))
@@ -65,19 +67,16 @@ pub async fn get_one_by_code(
     let is_admin = access_claims.validate_role_admin().is_ok();
 
     tracing::debug!(%code, "get one by code");
-    match short_url_service::get_by_code(&state.db_pool, &code).await? {
+    match state.short_url_service.get_by_code(&code).await? {
         None => {
             tracing::warn!(%code, "not found");
             Err(ApiError::from(ShortUrlError::NotFound(code)))
         }
         Some(short) => {
-            short_url_service::get_by_uuid_for_user(
-                &state.db_pool,
-                short.uuid,
-                user_uuid,
-                is_admin,
-            )
-            .await?;
+            state
+                .short_url_service
+                .get_by_uuid_for_user(short.uuid, user_uuid, is_admin)
+                .await?;
             tracing::debug!(%short, "ok");
             Ok(Json(short))
         }
@@ -97,13 +96,7 @@ pub async fn create_short_url(
 
     let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
 
-    let created = short_url_service::add_generated_code(
-        &state.db_pool,
-        state.code_generator.clone(),
-        state.max_retries,
-        dto,
-    )
-    .await?;
+    let created = state.short_url_service.add_generated_code(dto).await?;
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
     tracing::debug!(%payload, "ok");
@@ -130,9 +123,7 @@ pub async fn create_vanity_url(
         .try_into()
         .map_err(ApiError::from)?;
 
-    let created =
-        short_url_service::add_vanity_url(&state.db_pool, state.code_generator.clone(), dto)
-            .await?;
+    let created = state.short_url_service.add_vanity_url(dto).await?;
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(created);
     tracing::debug!(%payload, "ok");
@@ -155,14 +146,10 @@ pub async fn update_one_by_uuid(
         tracing::warn!(%e, "failed to parse a sub to a uuid from a parsed access token");
         AuthError::InvalidToken
     })?;
-    let updated = short_url_service::update_one_by_uuid(
-        uuid,
-        user_uuid,
-        dto,
-        &state.db_pool,
-        state.redirect_cache.clone(),
-    )
-    .await?;
+    let updated = state
+        .short_url_service
+        .update_one_by_uuid(uuid, user_uuid, dto)
+        .await?;
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(updated);
     Ok(Json(payload))
@@ -176,14 +163,10 @@ pub async fn delete_one_by_uuid(
     let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
     let is_admin = access_claims.validate_role_admin().is_ok();
 
-    if short_url_service::delete_one_by_uuid(
-        &state.db_pool,
-        state.redirect_cache.clone(),
-        uuid,
-        user_uuid,
-        is_admin,
-    )
-    .await?
+    if state
+        .short_url_service
+        .delete_one_by_uuid(uuid, user_uuid, is_admin)
+        .await?
     {
         tracing::debug!(%uuid, "ok");
         Ok(Json(uuid.to_string()))

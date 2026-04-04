@@ -224,7 +224,7 @@ async fn deleting_short_url_invalidates_cached_redirect() {
     let first = client.get(redirect_url.clone()).send().await.unwrap();
     assert_eq!(first.status(), StatusCode::MOVED_PERMANENTLY);
 
-    let cached_before = sut.state.redirect_cache.get(&short.code).await.unwrap();
+    let cached_before = sut.redirect_cache.get(&short.code).await.unwrap();
     assert!(cached_before.is_some());
 
     let delete = client
@@ -235,7 +235,7 @@ async fn deleting_short_url_invalidates_cached_redirect() {
         .unwrap();
     assert_eq!(delete.status(), StatusCode::OK);
 
-    let cached_after = sut.state.redirect_cache.get(&short.code).await.unwrap();
+    let cached_after = sut.redirect_cache.get(&short.code).await.unwrap();
     assert!(cached_after.is_none());
 
     let second = client.get(redirect_url).send().await.unwrap();

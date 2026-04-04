@@ -9,7 +9,7 @@ use serde_json::json;
 use std::fmt::{Display, Formatter, Result};
 
 use crate::{
-    application::security::auth_error::AuthError, domain::errors::user_error::UserError,
+    application::security::auth_error::AuthError, domain::errors::UserError,
     infrastructure::database::database_error::DatabaseError,
 };
 

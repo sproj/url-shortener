@@ -6,16 +6,17 @@ Completed and working:
 
 - Public `short_url` API is UUID-based; DB `id` is not exposed.
 - Short URL HTTP surface currently includes:
-  - `POST /shorten`
-  - `POST /shorten/vanity`
-  - `GET /shorten`
-  - `GET /shorten/{uuid}`
-  - `PATCH /shorten/{uuid}`
-  - `DELETE /shorten/{uuid}`
+  - `POST /shorten` (protected)
+  - `POST /shorten/vanity` (protected)
+  - `GET /shorten` (admin only)
+  - `GET /shorten/{uuid}` (owner or admin)
+  - `PATCH /shorten/{uuid}` (owner or admin)
+  - `DELETE /shorten/{uuid}` (owner or admin)
   - redirect path `/r/{code}`
 - Vanity URL creation is implemented and integration-tested.
 - Vanity URL update is implemented and integration-tested.
-- Ownership checks are now present for updating owned short URLs.
+- Ownership checks are now present across the protected short URL metadata routes.
+- Anonymous short URLs are treated as admin-only for metadata read/delete paths.
 - Redirect behavior is implemented and integration-tested:
   - `301` / `308` for permanent redirects
   - `302` / `307` for temporary redirects
@@ -32,11 +33,11 @@ Completed and working:
 
 - `users` table exists and `short_url.user_id` ownership column exists in migrations.
 - User vertical slice exists:
-  - create user
-  - list users
-  - get user by UUID
-  - soft delete user by UUID
-  - update password
+  - create user (open)
+  - list users (admin only)
+  - get user by UUID (self or admin)
+  - soft delete user by UUID (self or admin)
+  - update password (self or admin)
 - Password hashing + salt generation are in place.
 - Auth HTTP surface now exists and works:
   - `POST /login`
@@ -53,6 +54,7 @@ Completed and working:
   - cached refresh token is revoked
 - Access/refresh token type validation is enforced in extractors.
 - Authenticated user context is now used by vanity URL create/update flows.
+- Access-token protection has now been extended to most user and short URL routes.
 
 ## Test picture
 
@@ -74,6 +76,7 @@ Coverage/testing status:
 - redirect/cache behavior is covered well
 - login, logout, and refresh flows are integration-tested
 - vanity creation/update flows are integration-tested
+- protected-route authorization paths are integration-tested for users and short URLs
 - startup/config/database/redis error paths have focused unit tests
 - shared integration-test helper noise from `dead_code` was intentionally allowed in `tests/common`
 
@@ -87,19 +90,13 @@ Coverage/testing status:
 
 ## Immediate next focus
 
-1. Extend protected-route behavior beyond vanity URL create/update.
-2. Decide the remaining ownership rules for read/delete/list flows on owned short URLs.
-3. Revisit vanity code policy details:
+1. Decide whether any remaining routes should stay open beyond:
+   - `POST /users`
+   - public redirect `/r/{code}`
+2. Revisit vanity code policy details:
    - reserved values
    - update semantics
    - delete/reuse semantics
    - any admin override behavior
-4. Add protected-route coverage for the next authenticated feature beyond vanity URLs.
 
-## Secondary follow-up
 
-1. Deployment work can resume once auth/ownership shape is settled.
-2. Finalize Kubernetes manifests once runtime secret/config requirements stop moving.
-3. Consider cleaning up `AppBuilder` overrides that are currently misleading:
-   - `with_state(...)` is unused
-   - `with_max_retries(...)` does not currently override `AppState.max_retries`
