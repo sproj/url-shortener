@@ -7,7 +7,16 @@ use tokio::time::Instant;
 use url_shortener::{
     api::server,
     application::{
-        app::App, config::Config, service::short_url::code_generator::CodeGenerator,
+        app::App,
+        config::Config,
+        service::{
+            auth::refresh_token_cache_trait::{NoopRefreshTokenCache, RefreshTokenCacheTrait},
+            short_url::{
+                code_generator::CodeGenerator,
+                redirect_cache::RedirectCacheChecker,
+                redirect_cache_trait::{NoopRedirectCache, RedirectCache},
+            },
+        },
         state::SharedState,
     },
     infrastructure::{database::postgres::Database, redis::connect},
@@ -21,6 +30,8 @@ use crate::common::{
 
 pub struct TestApp {
     pub state: SharedState,
+    pub redirect_cache: Arc<dyn RedirectCache>,
+    pub refresh_token_cache: Arc<dyn RefreshTokenCacheTrait>,
     socket_address: SocketAddr,
     _db: Arc<SharedTestDb>,
     _redis: Option<Arc<SharedTestRedis>>,
@@ -89,10 +100,21 @@ impl TestAppBuilder {
             app_builder = app_builder.with_code_generator(code_generator);
         }
 
-        if let Some(redis) = &self.redis {
+        // Build test-side handles to the caches so tests can assert against them directly,
+        // without needing them on AppState. Both handles share the same Redis backend as the app.
+        let (redirect_cache, refresh_token_cache): (
+            Arc<dyn RedirectCache>,
+            Arc<dyn RefreshTokenCacheTrait>,
+        ) = if let Some(redis) = &self.redis {
             let conn = connect::connect(&redis.config).await.unwrap();
-            app_builder = app_builder.with_redis(conn);
-        }
+            app_builder = app_builder.with_redis(conn.clone());
+            (
+                Arc::new(RedirectCacheChecker::new(conn.clone())),
+                Arc::new(url_shortener::application::service::auth::refresh_token_cache::RefreshTokenCache::new(conn)),
+            )
+        } else {
+            (Arc::new(NoopRedirectCache), Arc::new(NoopRefreshTokenCache))
+        };
 
         let app = app_builder.build().await.unwrap();
         let state = app.state().clone();
@@ -107,6 +129,8 @@ impl TestAppBuilder {
 
         let sut = TestApp {
             socket_address: addr,
+            redirect_cache,
+            refresh_token_cache,
             _db: db,
             _redis: self.redis,
             state,

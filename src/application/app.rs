@@ -105,22 +105,19 @@ impl AppBuilder {
             short_url_service: Arc::new(ShortUrlService::new(
                 short_url_repository,
                 users_repository.clone(),
-                redirect_cache.clone(),
-                code_generator.clone(),
+                redirect_cache,
+                code_generator,
                 cfg.app.max_retries,
             )),
             user_service: user_service.clone(),
             auth_service: Arc::new(AuthService::new(
                 user_service,
-                refresh_token_cache.clone(),
+                refresh_token_cache,
                 cfg.jwt.jwt_expire_access_token_seconds,
                 cfg.jwt.jwt_expire_refresh_token_seconds,
                 cfg.jwt.jwt_keys.encoding.clone(),
             )),
             jwt_decoding_key: cfg.jwt.jwt_keys.decoding,
-            refresh_token_cache,
-            redirect_cache,
-            code_generator,
         });
         Ok(App {
             config: self.config,
