@@ -4,8 +4,8 @@ use tokio_postgres::types::{ToSql, Type};
 use uuid::Uuid;
 
 use crate::{
-    application::{repository::RepositoryResult, service::user::user_spec::UserSpec},
-    domain::models::user::User,
+    application::repository::RepositoryResult,
+    domain::{models::user::User, user_spec::UserSpec},
     infrastructure::database::database_error::DatabaseError,
 };
 

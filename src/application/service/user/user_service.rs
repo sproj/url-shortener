@@ -5,9 +5,9 @@ use crate::{
     application::{
         repository::users_repository as repository,
         security::auth::{generate_password_hash, generate_salt},
-        service::user::{create_user_params::CreateUserParams, user_spec::UserSpec},
+        service::user::create_user_params::CreateUserParams,
     },
-    domain::{errors::user_error::UserError, models::user::User},
+    domain::{errors::user_error::UserError, models::user::User, user_spec::UserSpec},
 };
 
 pub async fn list_all(pool: &Pool) -> Result<Vec<User>, UserError> {

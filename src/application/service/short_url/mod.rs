@@ -2,6 +2,7 @@ pub mod code_generator;
 pub mod redirect_cache;
 pub mod redirect_cache_trait;
 pub mod short_url_service;
+pub mod short_url_service_trait;
 
 mod short_url_spec;
 mod validated_create_short_url_request;
