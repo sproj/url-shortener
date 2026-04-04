@@ -12,6 +12,7 @@ use crate::{
 pub trait UserServiceTrait: Send + Sync {
     async fn list_all(&self) -> Result<Vec<User>, UserError>;
     async fn get_one_by_uuid(&self, uuid: Uuid) -> Result<Option<User>, UserError>;
+    async fn get_one_by_username(&self, user_name: &str) -> Result<Option<User>, UserError>;
     async fn delete_one_by_uuid(&self, user_uuid: Uuid) -> Result<bool, UserError>;
     async fn add_user(&self, params: CreateUserParams) -> Result<User, UserError>;
     async fn update_password_by_uuid(

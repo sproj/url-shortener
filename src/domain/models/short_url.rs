@@ -4,7 +4,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
 
-use crate::infrastructure::database::database_error::DatabaseError;
+use crate::{
+    domain::errors::RepositoryError, infrastructure::database::database_error::DatabaseError,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortUrl {
@@ -40,14 +42,14 @@ impl Display for ShortUrl {
 }
 
 impl TryFrom<Row> for ShortUrl {
-    type Error = DatabaseError;
+    type Error = RepositoryError;
     fn try_from(row: Row) -> Result<Self, Self::Error> {
         Self::try_from(&row)
     }
 }
 
 impl TryFrom<&Row> for ShortUrl {
-    type Error = DatabaseError;
+    type Error = RepositoryError;
     fn try_from(row: &Row) -> Result<Self, Self::Error> {
         Ok(Self {
             id: row

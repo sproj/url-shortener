@@ -15,7 +15,7 @@ use crate::{
     },
     application::{
         security::jwt::{AccessClaims, ClaimsMethods},
-        service::user::{create_user_params::CreateUserParams, user_service},
+        service::user::create_user_params::CreateUserParams,
         state::SharedState,
     },
     domain::errors::UserError,
@@ -26,7 +26,7 @@ pub async fn get_all(
     access_claims: AccessClaims,
 ) -> Result<Json<Vec<UserResponse>>, ApiError> {
     access_claims.validate_role_admin()?;
-    let users = user_service::list_all(&state.db_pool).await?;
+    let users = state.user_service.list_all().await?;
     Ok(Json(users.into_iter().map(UserResponse::from).collect()))
 }
 
@@ -38,7 +38,7 @@ pub async fn get_one_by_uuid(
     access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
     tracing::debug!(%subject_uuid, "get user by uuid");
-    match user_service::get_one_by_uuid(&state.db_pool, subject_uuid).await? {
+    match state.user_service.get_one_by_uuid(subject_uuid).await? {
         Some(user) => Ok(Json(user.into())),
         None => {
             tracing::warn!(%subject_uuid, "user not found");
@@ -56,7 +56,7 @@ pub async fn delete_one_by_uuid(
 ) -> Result<Json<String>, ApiError> {
     access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
-    user_service::delete_one_by_uuid(&state.db_pool, subject_uuid).await?;
+    state.user_service.delete_one_by_uuid(subject_uuid).await?;
     tracing::debug!(%subject_uuid, "user deleted");
     Ok(Json(subject_uuid.to_string()))
 }
@@ -72,7 +72,9 @@ pub async fn update_password(
 
     access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
-    if user_service::update_password_by_uuid(&state.db_pool, parsed_input.password, subject_uuid)
+    if state
+        .user_service
+        .update_password_by_uuid(parsed_input.password, subject_uuid)
         .await?
     {
         Ok(StatusCode::OK)
@@ -92,7 +94,7 @@ pub async fn create_user(
 
     let dto: CreateUserParams = parsed_input.into();
 
-    let created = user_service::add_user(&state.db_pool, dto).await?;
+    let created = state.user_service.add_user(dto).await?;
     let res = created.into();
 
     Ok((StatusCode::CREATED, Json(res)))

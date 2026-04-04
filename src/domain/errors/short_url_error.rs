@@ -4,8 +4,8 @@ use thiserror::Error;
 use crate::{
     api::error::{ApiError, ApiErrorKind},
     application::security::auth_error::AuthError,
-    domain::validation_issue::ValidationIssue,
-    infrastructure::{database::database_error::DatabaseError, redis::cache_error::CacheError},
+    domain::{errors::RepositoryError, validation_issue::ValidationIssue},
+    infrastructure::redis::cache_error::CacheError,
 };
 
 #[derive(Debug, Error)]
@@ -17,7 +17,7 @@ pub enum ShortUrlError {
     #[error("invalid input url: {0:?}")]
     InvalidInput(Vec<ValidationIssue>),
     #[error("data layer error: {0}")]
-    Storage(DatabaseError),
+    Storage(RepositoryError),
     #[error("code generation exhausted")]
     CodeGenerationExhausted,
     #[error("redis error: {0}")]
@@ -28,8 +28,8 @@ pub enum ShortUrlError {
     Unauthorized(#[from] AuthError),
 }
 
-impl From<DatabaseError> for ShortUrlError {
-    fn from(e: DatabaseError) -> Self {
+impl From<RepositoryError> for ShortUrlError {
+    fn from(e: RepositoryError) -> Self {
         Self::Storage(e)
     }
 }

@@ -1,6 +1,5 @@
 use crate::application::{
     security::{
-        auth::GeneratedClaimsDto,
         auth_error::AuthError,
         jwt::{JwtTokens, RefreshClaims},
     },
@@ -14,7 +13,7 @@ use crate::application::{
 /// are held by the concrete implementation struct.
 #[async_trait::async_trait]
 pub trait AuthServiceTrait: Send + Sync {
-    async fn verify_login(&self, params: LoginParams) -> Result<GeneratedClaimsDto, AuthError>;
+    async fn verify_login(&self, params: LoginParams) -> Result<JwtTokens, AuthError>;
     async fn cache_refresh_token(&self, claims: &RefreshClaims) -> Result<(), AuthError>;
     async fn refresh(&self, claims: RefreshClaims) -> Result<JwtTokens, AuthError>;
     async fn revoke_refresh(&self, access_token_jti: &str) -> Result<(), AuthError>;
