@@ -18,7 +18,7 @@ use crate::{
         service::user::{create_user_params::CreateUserParams, user_service},
         state::SharedState,
     },
-    domain::errors::user_error::UserError,
+    domain::errors::UserError,
 };
 
 pub async fn get_all(

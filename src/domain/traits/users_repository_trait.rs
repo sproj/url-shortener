@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::domain::{errors::user_error::UserError, models::user::User, user_spec::UserSpec};
+use crate::domain::{errors::UserError, models::user::User, user_spec::UserSpec};
 
 #[async_trait::async_trait]
 pub trait UsersRepositoryTrait: Send + Sync {

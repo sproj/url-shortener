@@ -3,7 +3,7 @@ use crate::{
         security::auth::{generate_password_hash, generate_salt},
         service::user::create_user_params::CreateUserParams,
     },
-    domain::{errors::user_error::UserError, user_spec::UserSpec},
+    domain::{errors::UserError, user_spec::UserSpec},
 };
 
 impl TryFrom<CreateUserParams> for UserSpec {

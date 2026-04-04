@@ -7,7 +7,7 @@ use crate::{
         security::auth::{generate_password_hash, generate_salt},
         service::user::create_user_params::CreateUserParams,
     },
-    domain::{errors::user_error::UserError, models::user::User, user_spec::UserSpec},
+    domain::{errors::UserError, models::user::User, user_spec::UserSpec},
 };
 
 pub async fn list_all(pool: &Pool) -> Result<Vec<User>, UserError> {

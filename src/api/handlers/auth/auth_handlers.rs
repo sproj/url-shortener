@@ -14,7 +14,7 @@ use crate::{
         service::{auth::auth_service, user::login_params::LoginParams},
         state::SharedState,
     },
-    domain::errors::user_error::UserError,
+    domain::errors::UserError,
 };
 
 pub async fn login(

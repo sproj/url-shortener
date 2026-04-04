@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use crate::{
     application::service::user::create_user_params::CreateUserParams,
-    domain::{errors::user_error::UserError, models::user::User},
+    domain::{errors::UserError, models::user::User},
 };
 
 /// Trait that defines the user service contract, independent of infrastructure.
