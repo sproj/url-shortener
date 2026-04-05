@@ -3,6 +3,7 @@ use axum::{
     http::{HeaderValue, Method, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use tracing::instrument;
 
 use crate::{
     api::error::ApiError,
@@ -10,6 +11,7 @@ use crate::{
     domain::errors::ShortUrlError,
 };
 
+#[instrument(skip(state))]
 pub async fn redirect(
     State(state): State<SharedState>,
     Path(code): Path<String>,

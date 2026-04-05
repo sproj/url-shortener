@@ -3,6 +3,7 @@ use axum::{
     extract::{Path, State, rejection::JsonRejection},
     http::StatusCode,
 };
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -83,6 +84,7 @@ pub async fn get_one_by_code(
     }
 }
 
+#[instrument(skip(state))]
 pub async fn create_short_url(
     State(state): State<SharedState>,
     req_payload: Result<Json<CreateShortUrlRequest>, JsonRejection>,
