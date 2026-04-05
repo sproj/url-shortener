@@ -1,21 +1,83 @@
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::{Resource, trace as sdktrace};
+use tracing_subscriber::Layer;
+use tracing_subscriber::filter::filter_fn;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use url_shortener::application::{app::App, config, startup_error::StartupError};
 use url_shortener::infrastructure::{database::postgres::Database, redis::connect};
 
 #[tokio::main]
 async fn main() -> Result<(), StartupError> {
-    tracing_subscriber::fmt::try_init()
+    let provider = init_tracer();
+
+    let tracer = provider.tracer("url-shortener");
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_opentelemetry::layer()
+                .with_tracer(tracer)
+                .with_filter(filter_fn(|meta| {
+                    !meta.target().starts_with("h2")
+                        && !meta.target().starts_with("tower")
+                        && !meta.target().starts_with("hyper")
+                })),
+        )
+        .try_init()
         .map_err(|e| StartupError::TracingSubscriber(e.to_string()))?;
 
+    let result = run().await;
+
+    provider
+        .shutdown()
+        .expect("tracer provider shutdown failed");
+
+    if let Err(e) = result {
+        eprintln!("startup error: {e}");
+        std::process::exit(1);
+    } else {
+        Ok(())
+    }
+}
+
+async fn run() -> Result<(), StartupError> {
     let cfg = config::load()?;
     let db_pool = Database::connect(&cfg.db)?;
     Database::migrate(&db_pool).await?;
 
     let redis = connect::connect(&cfg.redis).await?;
-
     App::builder(cfg, db_pool)
         .with_redis(redis)
         .build()
         .await?
         .start()
         .await
+}
+
+fn init_tracer() -> sdktrace::SdkTracerProvider {
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic() // gRPC, needs the grpc-tonic feature
+        .with_endpoint("http://localhost:4317") // default Jaeger OTLP gRPC port
+        .build()
+        .expect("failed to build OTLP exporter");
+
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        // .with_resource(Resource::new(vec![KeyValue::new(
+        //     "service.name",
+        //     "url-shortener",
+        // )]))
+        .with_batch_exporter(exporter)
+        .with_resource(
+            Resource::builder()
+                .with_service_name("url-shortener")
+                .build(),
+        )
+        .build();
+
+    // This sets the global OTel provider (optional but useful)
+    opentelemetry::global::set_tracer_provider(provider.clone());
+
+    provider
 }
