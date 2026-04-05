@@ -1,4 +1,5 @@
 use redis::{AsyncTypedCommands, aio::MultiplexedConnection};
+use tracing::instrument;
 
 use crate::{
     application::service::short_url::{
@@ -19,6 +20,7 @@ impl RedirectCacheChecker {
 
 #[async_trait::async_trait]
 impl RedirectCache for RedirectCacheChecker {
+    #[instrument(skip(self))]
     async fn get(&self, code: &str) -> Result<Option<RedirectDecision>, CacheError> {
         let mut conn = self.redis.clone();
         let raw: Option<String> = conn.get(code).await?;
@@ -28,6 +30,7 @@ impl RedirectCache for RedirectCacheChecker {
         }
     }
 
+    #[instrument(skip(self))]
     async fn set(
         &self,
         code: &str,
@@ -40,6 +43,7 @@ impl RedirectCache for RedirectCacheChecker {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn delete(&self, code: &str) -> Result<(), CacheError> {
         let mut conn = self.redis.clone();
         let _ = conn.del(code).await?;

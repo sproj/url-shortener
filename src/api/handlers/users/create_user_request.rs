@@ -1,8 +1,10 @@
+use std::fmt::Debug;
+
 use serde::Deserialize;
 
 use crate::application::service::user::create_user_params::CreateUserParams;
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct CreateUserRequest {
     pub username: String,
     pub email: String,
@@ -18,5 +20,11 @@ impl From<CreateUserRequest> for CreateUserParams {
             email: req.email,
             password: req.password,
         }
+    }
+}
+
+impl Debug for CreateUserRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "username: {}, email: {}", self.username, self.email)
     }
 }

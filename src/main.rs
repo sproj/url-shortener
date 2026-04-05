@@ -1,6 +1,7 @@
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, trace as sdktrace};
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::layer::SubscriberExt;
@@ -15,7 +16,11 @@ async fn main() -> Result<(), StartupError> {
     let tracer = provider.tracer("url-shortener");
 
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                EnvFilter::new("debug,opentelemetry_sdk=off,opentelemetry=off,h2=off,hyper=off")
+            }),
+        ))
         .with(
             tracing_opentelemetry::layer()
                 .with_tracer(tracer)
@@ -57,17 +62,16 @@ async fn run() -> Result<(), StartupError> {
 }
 
 fn init_tracer() -> sdktrace::SdkTracerProvider {
+    let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+        .unwrap_or_else(|_| "http://localhost:4317".to_string());
+
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic() // gRPC, needs the grpc-tonic feature
-        .with_endpoint("http://localhost:4317") // default Jaeger OTLP gRPC port
+        .with_endpoint(endpoint) // default Jaeger OTLP gRPC port
         .build()
         .expect("failed to build OTLP exporter");
 
     let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
-        // .with_resource(Resource::new(vec![KeyValue::new(
-        //     "service.name",
-        //     "url-shortener",
-        // )]))
         .with_batch_exporter(exporter)
         .with_resource(
             Resource::builder()

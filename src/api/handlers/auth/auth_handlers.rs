@@ -3,6 +3,7 @@ use axum::{
     extract::{State, rejection::JsonRejection},
     response::IntoResponse,
 };
+use tracing::instrument;
 
 use crate::{
     api::{error::ApiError, handlers::auth::login_request::LoginRequest},
@@ -14,6 +15,7 @@ use crate::{
     domain::errors::UserError,
 };
 
+#[instrument(skip(state))]
 pub async fn login(
     State(state): State<SharedState>,
     payload: Result<Json<LoginRequest>, JsonRejection>,
@@ -31,6 +33,7 @@ pub async fn login(
     Ok(res)
 }
 
+#[instrument(skip(state, access_claims))]
 pub async fn logout(
     State(state): State<SharedState>,
     access_claims: AccessClaims,
@@ -42,6 +45,7 @@ pub async fn logout(
         .map_err(ApiError::from)
 }
 
+#[instrument(skip(state, refresh_claims))]
 pub async fn refresh(
     State(state): State<SharedState>,
     refresh_claims: RefreshClaims,

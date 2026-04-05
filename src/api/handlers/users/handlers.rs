@@ -3,6 +3,7 @@ use axum::{
     extract::{Path, State, rejection::JsonRejection},
     http::StatusCode,
 };
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -21,6 +22,7 @@ use crate::{
     domain::errors::UserError,
 };
 
+#[instrument(skip(state, access_claims))]
 pub async fn get_all(
     State(state): State<SharedState>,
     access_claims: AccessClaims,
@@ -30,6 +32,7 @@ pub async fn get_all(
     Ok(Json(users.into_iter().map(UserResponse::from).collect()))
 }
 
+#[instrument(skip(state))]
 pub async fn get_one_by_uuid(
     State(state): State<SharedState>,
     Path(subject_uuid): Path<Uuid>,
@@ -49,6 +52,7 @@ pub async fn get_one_by_uuid(
     }
 }
 
+#[instrument(skip(state, access_claims))]
 pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
     Path(subject_uuid): Path<Uuid>,
@@ -61,6 +65,7 @@ pub async fn delete_one_by_uuid(
     Ok(Json(subject_uuid.to_string()))
 }
 
+#[instrument(skip(state, access_claims, req_payload))]
 pub async fn update_password(
     State(state): State<SharedState>,
     Path(subject_uuid): Path<Uuid>,
@@ -85,6 +90,7 @@ pub async fn update_password(
     }
 }
 
+#[instrument(skip(state))]
 pub async fn create_user(
     State(state): State<SharedState>,
     req_payload: Result<Json<CreateUserRequest>, JsonRejection>,

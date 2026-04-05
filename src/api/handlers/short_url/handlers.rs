@@ -25,6 +25,7 @@ use crate::{
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
 };
 
+#[instrument(skip(state, access_claims))]
 pub async fn get_all(
     access_claims: AccessClaims,
     State(state): State<SharedState>,
@@ -35,6 +36,7 @@ pub async fn get_all(
     Ok(Json(short_urls))
 }
 
+#[instrument(skip(state, access_claims))]
 pub async fn get_one_by_uuid(
     access_claims: AccessClaims,
     State(state): State<SharedState>,
@@ -59,6 +61,7 @@ pub async fn get_one_by_uuid(
 
 // Note: this handler is not currently registered in any route. Auth is added here for
 // consistency so it is ready when the route is wired up.
+#[instrument(skip(state, access_claims))]
 pub async fn get_one_by_code(
     access_claims: AccessClaims,
     State(state): State<SharedState>,
@@ -106,6 +109,7 @@ pub async fn create_short_url(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
+#[instrument(skip(state, access_claims))]
 pub async fn create_vanity_url(
     access_claims: AccessClaims,
     State(state): State<SharedState>,
@@ -133,6 +137,7 @@ pub async fn create_vanity_url(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
+#[instrument(skip(state, access_claims))]
 pub async fn update_one_by_uuid(
     Path(uuid): Path<Uuid>,
     access_claims: AccessClaims,
@@ -157,6 +162,7 @@ pub async fn update_one_by_uuid(
     Ok(Json(payload))
 }
 
+#[instrument(skip(state, access_claims))]
 pub async fn delete_one_by_uuid(
     access_claims: AccessClaims,
     State(state): State<SharedState>,

@@ -2,6 +2,7 @@ use std::{ops::Sub, sync::Arc};
 
 use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -85,8 +86,10 @@ impl ShortUrlService {
         Ok(())
     }
 }
+
 #[async_trait::async_trait]
 impl ShortUrlServiceTrait for ShortUrlService {
+    #[instrument(skip(self))]
     async fn get_all(&self) -> Result<Vec<ShortUrl>, ShortUrlError> {
         self.short_url_repository
             .get_all()
@@ -94,6 +97,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
             .map_err(ShortUrlError::Storage)
     }
 
+    #[instrument(skip(self))]
     async fn get_by_uuid(&self, short_url_uuid: Uuid) -> Result<Option<ShortUrl>, ShortUrlError> {
         self.short_url_repository
             .get_by_uuid(short_url_uuid)
@@ -103,6 +107,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
 
     /// Like `get_by_uuid` but enforces that the caller either owns the URL or is an admin.
     /// Anonymous short URLs (no `user_id`) are accessible by admins only.
+    #[instrument(skip(self))]
     async fn get_by_uuid_for_user(
         &self,
         short_url_uuid: Uuid,
@@ -122,6 +127,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         Ok(Some(short))
     }
 
+    #[instrument(skip(self))]
     async fn get_by_code(&self, code: &str) -> Result<Option<ShortUrl>, ShortUrlError> {
         self.short_url_repository
             .get_by_code(code)
@@ -129,6 +135,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
             .map_err(ShortUrlError::Storage)
     }
 
+    #[instrument(skip(self))]
     async fn delete_one_by_uuid(
         &self,
         short_url_uuid: Uuid,
@@ -162,6 +169,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         }
     }
 
+    #[instrument(skip(self))]
     async fn add_generated_code(
         &self,
         dto: ValidatedCreateShortUrlRequest,
@@ -227,6 +235,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         Err(ShortUrlError::CodeGenerationExhausted)
     }
 
+    #[instrument(skip(self))]
     async fn add_vanity_url(
         &self,
         dto: ValidatedCreateShortUrlRequest,
@@ -276,6 +285,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         }
     }
 
+    #[instrument(skip(self))]
     async fn update_one_by_uuid(
         &self,
         short_uuid: Uuid,
@@ -347,6 +357,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         Ok(update_result)
     }
 
+    #[instrument(skip(self))]
     async fn resolve_redirect_decision(
         &self,
         code: &str,
