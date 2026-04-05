@@ -4,6 +4,7 @@ use argon2::{
 };
 use jsonwebtoken::EncodingKey;
 use rand_core::OsRng;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
     domain::models::user::User,
 };
 
+#[instrument(skip_all)]
 pub fn compare_password_hashes(
     true_hash: &str,
     user_input_password: String,
@@ -24,10 +26,12 @@ pub fn compare_password_hashes(
         .map_err(|_| AuthError::IncorrectCredentials)
 }
 
+#[instrument]
 pub fn generate_salt() -> SaltString {
     SaltString::generate(&mut OsRng)
 }
 
+#[instrument(skip_all)]
 pub fn generate_password_hash(pw: &[u8], salt: &SaltString) -> Result<String, AuthError> {
     let argon2 = Argon2::default();
 
@@ -56,6 +60,7 @@ pub struct GeneratedClaimsDto {
     pub refresh_claims: RefreshClaims,
 }
 
+#[instrument(skip(user), fields(user.uuid = %user.uuid, user.email = %user.email, user.username=%user.username))]
 pub fn generate_claims(
     access_token_expiry_seconds: i64,
     refresh_token_expiry_seconds: i64,
@@ -103,6 +108,7 @@ pub fn generate_claims(
     })
 }
 
+#[instrument(skip(jwt_encoding_key))]
 pub fn encode_tokens(
     jwt_encoding_key: &EncodingKey,
     access_claims: AccessClaims,

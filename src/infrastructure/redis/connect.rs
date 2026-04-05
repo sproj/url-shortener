@@ -1,7 +1,9 @@
 use redis::aio::MultiplexedConnection;
+use tracing::instrument;
 
 use crate::application::{config::RedisConfig, startup_error::StartupError};
 
+#[instrument(skip_all)]
 pub async fn connect(config: &RedisConfig) -> Result<MultiplexedConnection, StartupError> {
     let url = format!("redis://{}:{}", config.redis_host, config.redis_port);
     match redis::Client::open(url) {

@@ -1,6 +1,7 @@
 use chrono::Utc;
 use deadpool_postgres::Pool;
 use tokio_postgres::types::{ToSql, Type};
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -60,6 +61,7 @@ impl PostgresUsersRepository {
 
 #[async_trait::async_trait]
 impl UsersRepositoryTrait for PostgresUsersRepository {
+    #[instrument(skip(self))]
     async fn get_all(&self) -> RepositoryResult<Vec<User>> {
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
 
@@ -76,6 +78,7 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
             .collect::<Result<_, _>>()
     }
 
+    #[instrument(skip(self))]
     async fn get_user_by_uuid(&self, uuid: Uuid) -> RepositoryResult<Option<User>> {
         tracing::debug!(%uuid, "get by uuid");
         self.pool
@@ -96,6 +99,7 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
             .transpose()
     }
 
+    #[instrument(skip(self))]
     async fn get_user_by_username(&self, username: &str) -> RepositoryResult<Option<User>> {
         tracing::debug!(%username, "finding user by username");
         self.pool
@@ -116,6 +120,7 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
             .transpose()
     }
 
+    #[instrument(skip(self), fields(username = %spec.username, email = %spec.email, uuid = %spec.uuid))]
     async fn add_user(&self, spec: UserSpec) -> RepositoryResult<User> {
         tracing::debug!(%spec, "insert user spec");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
@@ -155,6 +160,7 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
         }
     }
 
+    #[instrument(skip(self))]
     async fn soft_delete_user_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
         tracing::debug!(%uuid, "delete user by uuid");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
@@ -174,6 +180,7 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
         Ok(delete_user_result != 0)
     }
 
+    #[instrument(skip(self), fields(uuid = %uuid))]
     async fn update_password_by_uuid(
         &self,
         uuid: Uuid,

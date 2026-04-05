@@ -2,6 +2,7 @@ use std::ops::DerefMut;
 
 use deadpool_postgres::{Config as PgConfig, ManagerConfig, Pool, RecyclingMethod};
 use tokio_postgres::NoTls;
+use tracing::instrument;
 
 use crate::application::{config::DbConfig, startup_error::StartupError};
 
@@ -13,6 +14,7 @@ mod embedded {
 pub struct Database;
 
 impl Database {
+    #[instrument(skip(config))]
     pub fn connect(config: &DbConfig) -> Result<Pool, StartupError> {
         tracing::info!("Creating database connection pool");
 
@@ -39,6 +41,7 @@ impl Database {
         Ok(pool)
     }
 
+    #[instrument(skip_all)]
     pub async fn migrate(db_pool: &Pool) -> Result<refinery::Report, StartupError> {
         tracing::info!("Running migrations");
 

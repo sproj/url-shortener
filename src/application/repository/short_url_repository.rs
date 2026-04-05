@@ -9,6 +9,7 @@ use crate::{
 use chrono::Utc;
 use deadpool_postgres::{GenericClient, Pool};
 use tokio_postgres::types::{ToSql, Type};
+use tracing::instrument;
 use uuid::Uuid;
 
 const SELECT_SHORT_URL_ROW: &str = "SELECT
@@ -45,6 +46,7 @@ impl PostgresShortUrlRepository {
 
 #[async_trait::async_trait]
 impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
+    #[instrument(skip(self))]
     async fn get_all(&self) -> RepositoryResult<Vec<ShortUrl>> {
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
 
@@ -61,6 +63,7 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
             .collect::<Result<Vec<_>, _>>()
     }
 
+    #[instrument(skip(self))]
     async fn get_by_uuid(&self, uuid: Uuid) -> RepositoryResult<Option<ShortUrl>> {
         tracing::debug!(%uuid, "get by uuid");
         self.pool
@@ -82,6 +85,7 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
             .map_err(|e| RepositoryError::Internal(e.to_string()))
     }
 
+    #[instrument(skip(self))]
     async fn get_by_code(&self, code: &str) -> RepositoryResult<Option<ShortUrl>> {
         tracing::debug!(%code, "get by code");
         self.pool
@@ -99,6 +103,7 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
             .map_err(|e| RepositoryError::Internal(e.to_string()))
     }
 
+    #[instrument(skip(self))]
     async fn add_one(&self, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
         tracing::debug!(%spec, "insert short_url spec");
 
@@ -129,6 +134,7 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
         short_url_row_to_model(inserted_long_url_row)
     }
 
+    #[instrument(skip(self))]
     async fn update_one_by_uuid(&self, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
         tracing::debug!(%spec, "update short_url spec");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
@@ -149,6 +155,7 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
         short_url_row_to_model(res)
     }
 
+    #[instrument(skip(self))]
     async fn delete_one_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
         tracing::debug!(%uuid, "delete short_url by uuid");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;

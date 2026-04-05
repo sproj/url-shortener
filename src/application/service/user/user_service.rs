@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -23,8 +24,10 @@ impl UsersService {
         Self { users_repository }
     }
 }
+
 #[async_trait::async_trait]
 impl UserServiceTrait for UsersService {
+    #[instrument(skip(self))]
     async fn list_all(&self) -> Result<Vec<User>, UserError> {
         self.users_repository
             .get_all()
@@ -32,6 +35,7 @@ impl UserServiceTrait for UsersService {
             .map_err(UserError::from)
     }
 
+    #[instrument(skip(self))]
     async fn get_one_by_uuid(&self, uuid: Uuid) -> Result<Option<User>, UserError> {
         self.users_repository
             .get_user_by_uuid(uuid)
@@ -39,6 +43,7 @@ impl UserServiceTrait for UsersService {
             .map_err(UserError::from)
     }
 
+    #[instrument(skip(self))]
     async fn get_one_by_username(&self, user_name: &str) -> Result<Option<User>, UserError> {
         self.users_repository
             .get_user_by_username(user_name)
@@ -46,6 +51,7 @@ impl UserServiceTrait for UsersService {
             .map_err(UserError::from)
     }
 
+    #[instrument(skip(self))]
     async fn delete_one_by_uuid(&self, user_uuid: Uuid) -> Result<bool, UserError> {
         if self
             .users_repository
@@ -63,6 +69,7 @@ impl UserServiceTrait for UsersService {
         }
     }
 
+    #[instrument(skip(self), fields(username = %params.username, email = %params.email, roles = %params.roles))]
     async fn add_user(&self, params: CreateUserParams) -> Result<User, UserError> {
         let spec = UserSpec::try_from(params)?;
 
@@ -75,6 +82,7 @@ impl UserServiceTrait for UsersService {
         }
     }
 
+    #[instrument(skip(self, new_pass))]
     async fn update_password_by_uuid(
         &self,
         new_pass: String,

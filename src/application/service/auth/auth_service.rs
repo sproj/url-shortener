@@ -1,5 +1,6 @@
 use jsonwebtoken::EncodingKey;
 use std::sync::Arc;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::application::{
@@ -44,8 +45,10 @@ impl AuthService {
         }
     }
 }
+
 #[async_trait::async_trait]
 impl AuthServiceTrait for AuthService {
+    #[instrument(skip(self), fields(params.username = %params.username))]
     async fn verify_login(&self, params: LoginParams) -> Result<JwtTokens, AuthError> {
         let claims = match self
             .user_service
@@ -84,6 +87,7 @@ impl AuthServiceTrait for AuthService {
         )
     }
 
+    #[instrument(skip(self), fields(sub = %refresh_claims.sub))]
     async fn cache_refresh_token(&self, refresh_claims: &RefreshClaims) -> Result<(), AuthError> {
         let refresh_exp_secs = refresh_claims.exp as u64;
         let now = chrono::Utc::now().timestamp();
@@ -105,6 +109,7 @@ impl AuthServiceTrait for AuthService {
         Ok(())
     }
 
+    #[instrument(skip(self), fields(sub = %refresh_claims.sub))]
     async fn refresh(&self, refresh_claims: RefreshClaims) -> Result<JwtTokens, AuthError> {
         let jti = refresh_claims.get_jti();
         if !validate_token_type(&refresh_claims, JwtTokenType::RefreshToken) {
@@ -165,6 +170,7 @@ impl AuthServiceTrait for AuthService {
         }
     }
 
+    #[instrument(skip(self))]
     async fn revoke_refresh(&self, access_token_jti: &str) -> Result<(), AuthError> {
         self.refresh_token_cache
             .revoke(access_token_jti)

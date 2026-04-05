@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use base64_url::base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use rand::Rng;
 use std::sync::Mutex;
+use tracing::instrument;
 
 pub trait CodeGenerator: Send + Sync {
     fn next_code(&self) -> String;
@@ -34,6 +35,7 @@ impl FixedCodeGenerator {
 }
 
 impl CodeGenerator for FixedCodeGenerator {
+    #[instrument(skip(self))]
     fn next_code(&self) -> String {
         self.codes.lock().unwrap().pop_front().unwrap()
     }
