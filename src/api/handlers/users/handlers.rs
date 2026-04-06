@@ -77,17 +77,12 @@ pub async fn update_password(
 
     access_claims.assert_is_subject_or_admin(subject_uuid)?;
 
-    if state
+    state
         .user_service
         .update_password_by_uuid(parsed_input.password, subject_uuid)
-        .await?
-    {
-        Ok(StatusCode::OK)
-    } else {
-        Err(ApiError::from(UserError::NotFound(
-            subject_uuid.to_string(),
-        )))
-    }
+        .await?;
+
+    Ok(StatusCode::OK)
 }
 
 #[instrument(skip(state))]
