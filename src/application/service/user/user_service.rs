@@ -52,14 +52,14 @@ impl UserServiceTrait for UsersService {
     }
 
     #[instrument(skip(self))]
-    async fn delete_one_by_uuid(&self, user_uuid: Uuid) -> Result<bool, UserError> {
+    async fn delete_one_by_uuid(&self, user_uuid: Uuid) -> Result<(), UserError> {
         if self
             .users_repository
             .soft_delete_user_by_uuid(user_uuid)
             .await
             .map_err(UserError::from)?
         {
-            Ok(true)
+            Ok(())
         } else {
             tracing::warn!(%user_uuid, "deletion attempted for user with unfound uuid");
             Err(UserError::NotFound(format!(
@@ -83,11 +83,7 @@ impl UserServiceTrait for UsersService {
     }
 
     #[instrument(skip(self, new_pass))]
-    async fn update_password_by_uuid(
-        &self,
-        new_pass: String,
-        uuid: Uuid,
-    ) -> Result<bool, UserError> {
+    async fn update_password_by_uuid(&self, new_pass: String, uuid: Uuid) -> Result<(), UserError> {
         let salt = generate_salt();
         let password_hash = generate_password_hash(new_pass.as_bytes(), &salt)
             .map_err(UserError::AuthenticationError)?;
@@ -97,7 +93,7 @@ impl UserServiceTrait for UsersService {
             .update_password_by_uuid(uuid, &password_hash, salt.as_str())
             .await
         {
-            Ok(true) => Ok(true),
+            Ok(true) => Ok(()),
             Ok(false) => Err(UserError::NotFound(uuid.to_string())),
             Err(e) => Err(UserError::Storage(e)),
         }
@@ -249,9 +245,9 @@ mod tests {
 
         let user_uuid = user.uuid;
 
-        let actual = sut.delete_one_by_uuid(user.uuid).await.unwrap();
+        let actual = sut.delete_one_by_uuid(user.uuid).await;
 
-        assert!(actual);
+        assert!(actual.is_ok());
 
         let check = sut.get_one_by_uuid(user_uuid).await.unwrap();
         assert!(check.is_some_and(|usr| usr.deleted_at.is_some()));
@@ -281,10 +277,9 @@ mod tests {
 
         let actual = sut
             .update_password_by_uuid("new-password".to_string(), user.uuid)
-            .await
-            .unwrap();
+            .await;
 
-        assert!(actual);
+        assert!(actual.is_ok());
 
         let updated_user = sut.get_one_by_uuid(user.uuid).await.unwrap().unwrap();
         assert_ne!(updated_user.password_hash, original_password_hash);

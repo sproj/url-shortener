@@ -100,7 +100,7 @@ impl UsersRepositoryTrait for InMemoryMockUsersRepository {
 
         lock.push(user.clone());
 
-        return Ok(user);
+        Ok(user)
     }
     async fn soft_delete_user_by_uuid(&self, uuid: Uuid) -> Result<bool, RepositoryError> {
         let mut lock = self
