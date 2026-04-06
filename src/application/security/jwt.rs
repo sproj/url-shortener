@@ -3,6 +3,7 @@ use jsonwebtoken::{DecodingKey, EncodingKey, errors::ErrorKind};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Display;
+use utoipa::ToSchema;
 
 use crate::application::{
     constants::USER_ROLE_ADMIN,
@@ -30,7 +31,7 @@ impl JwtKeys {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct JwtTokens {
     pub access_token: String,
     pub refresh_token: String,

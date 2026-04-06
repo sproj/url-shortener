@@ -25,6 +25,18 @@ use crate::{
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
 };
 
+#[utoipa::path(
+    get,
+    path = "/shorten",
+    tag = "short-url",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "List all short URLs", body = [ShortUrl]),
+        (status = 403, description = "Admin role required", body = ApiError),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 500, description = "Unexpected data access error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn get_all(
     access_claims: AccessClaims,
@@ -36,6 +48,22 @@ pub async fn get_all(
     Ok(Json(short_urls))
 }
 
+#[utoipa::path(
+    get,
+    path = "/shorten/{uuid}",
+    tag = "short-url",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "Short URL UUID")
+    ),
+    responses(
+        (status = 200, description = "Short URL found", body = ShortUrl),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 404, description = "Short URL was not found", body = ApiError),
+        (status = 500, description = "Unexpected data access error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn get_one_by_uuid(
     access_claims: AccessClaims,
@@ -87,6 +115,18 @@ pub async fn get_one_by_code(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/shorten",
+    tag = "short-url",
+    request_body = CreateShortUrlRequest,
+    responses(
+        (status = 201, description = "Short URL created", body = CreateShortUrlResponse),
+        (status = 400, description = "Request content failed validation", body = ApiError),
+        (status = 422, description = "Request body could not be parsed", body = ApiError),
+        (status = 500, description = "Unexpected creation error", body = ApiError)
+    )
+)]
 #[instrument(skip(state))]
 pub async fn create_short_url(
     State(state): State<SharedState>,
@@ -109,6 +149,21 @@ pub async fn create_short_url(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
+#[utoipa::path(
+    post,
+    path = "/shorten/vanity",
+    tag = "short-url",
+    security(("bearerAuth" = [])),
+    request_body = CreateVanityUrlRequest,
+    responses(
+        (status = 201, description = "Vanity short URL created", body = CreateShortUrlResponse),
+        (status = 400, description = "Request content failed validation", body = ApiError),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 409, description = "Requested vanity code already exists", body = ApiError),
+        (status = 422, description = "Request body could not be parsed", body = ApiError),
+        (status = 500, description = "Unexpected creation error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn create_vanity_url(
     access_claims: AccessClaims,
@@ -137,6 +192,25 @@ pub async fn create_vanity_url(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/shorten/{uuid}",
+    tag = "short-url",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "Short URL UUID")
+    ),
+    request_body = UpdateShortUrlRequest,
+    responses(
+        (status = 200, description = "Short URL updated", body = CreateShortUrlResponse),
+        (status = 400, description = "Request content failed validation", body = ApiError),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 404, description = "Short URL was not found", body = ApiError),
+        (status = 422, description = "Request body could not be parsed", body = ApiError),
+        (status = 500, description = "Unexpected update error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn update_one_by_uuid(
     Path(uuid): Path<Uuid>,
@@ -162,6 +236,22 @@ pub async fn update_one_by_uuid(
     Ok(Json(payload))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/shorten/{uuid}",
+    tag = "short-url",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "Short URL UUID")
+    ),
+    responses(
+        (status = 200, description = "Short URL deleted", body = String),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 404, description = "Short URL was not found", body = ApiError),
+        (status = 500, description = "Unexpected deletion error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn delete_one_by_uuid(
     access_claims: AccessClaims,

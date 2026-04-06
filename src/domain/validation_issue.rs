@@ -1,8 +1,9 @@
 use std::fmt::Display;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ValidationIssue {
     pub field: String,
     pub code: &'static str,

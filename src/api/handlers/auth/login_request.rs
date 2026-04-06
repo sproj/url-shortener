@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::application::service::user::login_params::LoginParams;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,

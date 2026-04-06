@@ -2,6 +2,7 @@ use crate::{
     api::{
         handlers::auth::auth_handlers::{login, logout, refresh},
         routes::{redirect_routes, short_url_routes, users_routes},
+        swagger::{ApiDoc, StatusResponse},
     },
     application::{config::Config, startup_error::StartupError, state::SharedState},
 };
@@ -15,6 +16,8 @@ use axum::{
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
 use tower_http::normalize_path::NormalizePathLayer;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 pub async fn start(config: Config, state: SharedState) -> Result<(), StartupError> {
     let listener = listen(config).await?;
@@ -30,6 +33,8 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
 }
 
 pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
+    let openapi = ApiDoc::openapi();
+
     let router = Router::new()
         .route("/login", post(login))
         .route("/logout", post(logout))
@@ -39,6 +44,7 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .nest("/shorten", short_url_routes::routes())
         .nest("/users", users_routes::routes())
         .nest("/r", redirect_routes::routes())
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .fallback(error_404_handler)
         .layer(NormalizePathLayer::trim_trailing_slash())
         .with_state(state);
@@ -49,8 +55,16 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .map_err(|e| StartupError::Server(e.to_string()))
 }
 
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "system",
+    responses(
+        (status = 200, description = "Service is healthy", body = StatusResponse)
+    )
+)]
 // health request handler
-async fn health_handler() -> Result<impl IntoResponse, ()> {
+pub(crate) async fn health_handler() -> Result<impl IntoResponse, ()> {
     Ok(Json(json!({"status": "healthy"})))
 }
 
@@ -60,8 +74,17 @@ async fn error_404_handler(request: Request) -> impl IntoResponse {
     StatusCode::NOT_FOUND
 }
 
+#[utoipa::path(
+    get,
+    path = "/ready",
+    tag = "system",
+    responses(
+        (status = 200, description = "Dependencies are ready"),
+        (status = 503, description = "Dependencies are not ready")
+    )
+)]
 // ready handler
-async fn ready_handler(State(state): State<SharedState>) -> StatusCode {
+pub(crate) async fn ready_handler(State(state): State<SharedState>) -> StatusCode {
     match state.db_pool.get().await {
         Ok(client) => {
             if client.query_one("SELECT 1", &[]).await.is_ok() {
