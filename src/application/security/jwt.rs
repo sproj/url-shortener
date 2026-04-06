@@ -67,7 +67,7 @@ impl Display for AccessClaims {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefreshClaims {
     /// Subject.
     pub sub: String,
@@ -198,6 +198,7 @@ impl ClaimsMethods for RefreshClaims {
 
 #[cfg(test)]
 mod tests {
+    use axum::body::to_bytes;
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -238,6 +239,42 @@ mod tests {
             roles: roles.to_string(),
             typ: JwtTokenType::AccessToken as u8,
         }
+    }
+
+    fn make_refresh_claims_with_roles(roles: &str) -> RefreshClaims {
+        RefreshClaims {
+            sub: Uuid::now_v7().to_string(),
+            jti: Uuid::now_v7().to_string(),
+            iat: Utc::now().timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::minutes(15)).timestamp() as usize,
+            prf: Uuid::now_v7().to_string(),
+            pex: (Utc::now() + chrono::Duration::minutes(5)).timestamp() as usize,
+            typ: JwtTokenType::RefreshToken as u8,
+            roles: roles.to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn tokens_to_response_includes_bearer_and_both_tokens() {
+        let response = tokens_to_response(JwtTokens {
+            access_token: "access-token".to_string(),
+            refresh_token: "refresh-token".to_string(),
+        })
+        .into_response();
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let actual: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(actual["access_token"], "access-token");
+        assert_eq!(actual["refresh_token"], "refresh-token");
+        assert_eq!(actual["token_type"], "Bearer");
+    }
+
+    #[test]
+    fn jwt_token_type_from_maps_expected_variants() {
+        assert_eq!(JwtTokenType::from(0), JwtTokenType::AccessToken);
+        assert_eq!(JwtTokenType::from(1), JwtTokenType::RefreshToken);
+        assert_eq!(JwtTokenType::from(9), JwtTokenType::UnknownToken);
     }
 
     // --- generate_tokens + decode_token roundtrip ---
@@ -382,6 +419,96 @@ mod tests {
     fn validate_role_admin_trims_whitespace() {
         let claims = make_claims_with_roles("user, admin");
         assert!(claims.validate_role_admin().is_ok());
+    }
+
+    #[test]
+    fn refresh_claims_validate_role_admin_accepts_admin_role() {
+        let claims = make_refresh_claims_with_roles("user,admin");
+
+        assert!(claims.validate_role_admin().is_ok());
+    }
+
+    #[test]
+    fn refresh_claims_validate_role_admin_rejects_non_admin() {
+        let claims = make_refresh_claims_with_roles("user");
+
+        assert!(matches!(
+            claims.validate_role_admin(),
+            Err(AuthError::Forbidden)
+        ));
+    }
+
+    #[test]
+    fn assert_is_subject_or_admin_accepts_subject_match() {
+        let subject_uuid = Uuid::now_v7();
+        let claims = AccessClaims {
+            sub: subject_uuid.to_string(),
+            aud: "url-shortener".to_string(),
+            iss: "url-shortener".to_string(),
+            iat: 0,
+            exp: usize::MAX,
+            jti: "test-jti".to_string(),
+            roles: "user".to_string(),
+            typ: JwtTokenType::AccessToken as u8,
+        };
+
+        let actual = claims.assert_is_subject_or_admin(subject_uuid);
+
+        assert!(actual.is_ok());
+    }
+
+    #[test]
+    fn assert_is_subject_or_admin_accepts_admin_for_other_subject() {
+        let claims = AccessClaims {
+            sub: Uuid::now_v7().to_string(),
+            aud: "url-shortener".to_string(),
+            iss: "url-shortener".to_string(),
+            iat: 0,
+            exp: usize::MAX,
+            jti: "test-jti".to_string(),
+            roles: "admin".to_string(),
+            typ: JwtTokenType::AccessToken as u8,
+        };
+
+        let actual = claims.assert_is_subject_or_admin(Uuid::now_v7());
+
+        assert!(actual.is_ok());
+    }
+
+    #[test]
+    fn assert_is_subject_or_admin_rejects_non_admin_for_other_subject() {
+        let claims = AccessClaims {
+            sub: Uuid::now_v7().to_string(),
+            aud: "url-shortener".to_string(),
+            iss: "url-shortener".to_string(),
+            iat: 0,
+            exp: usize::MAX,
+            jti: "test-jti".to_string(),
+            roles: "user".to_string(),
+            typ: JwtTokenType::AccessToken as u8,
+        };
+
+        let actual = claims.assert_is_subject_or_admin(Uuid::now_v7());
+
+        assert!(matches!(actual, Err(AuthError::Forbidden)));
+    }
+
+    #[test]
+    fn assert_is_subject_or_admin_rejects_invalid_subject_uuid() {
+        let claims = AccessClaims {
+            sub: "not-a-uuid".to_string(),
+            aud: "url-shortener".to_string(),
+            iss: "url-shortener".to_string(),
+            iat: 0,
+            exp: usize::MAX,
+            jti: "test-jti".to_string(),
+            roles: "admin".to_string(),
+            typ: JwtTokenType::AccessToken as u8,
+        };
+
+        let actual = claims.assert_is_subject_or_admin(Uuid::now_v7());
+
+        assert!(matches!(actual, Err(AuthError::InvalidToken)));
     }
 }
 

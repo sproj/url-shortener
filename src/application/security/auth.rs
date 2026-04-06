@@ -144,8 +144,43 @@ pub fn encode_tokens(
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
     use crate::application::security::auth_error::AuthError;
+
+    fn test_encoding_key() -> EncodingKey {
+        EncodingKey::from_secret(b"test-secret-for-auth-rs-unit-tests")
+    }
+
+    fn make_test_user() -> User {
+        User {
+            id: 1,
+            uuid: Uuid::now_v7(),
+            username: "test-user".to_string(),
+            email: "test-user@example.com".to_string(),
+            password_hash: "unused-hash".to_string(),
+            password_salt: "unused-salt".to_string(),
+            active: true,
+            roles: "user,admin".to_string(),
+            created_at: Utc::now(),
+            updated_at: None,
+            deleted_at: None,
+        }
+    }
+
+    fn make_refresh_claims(token_type: JwtTokenType) -> RefreshClaims {
+        RefreshClaims {
+            sub: Uuid::now_v7().to_string(),
+            jti: Uuid::now_v7().to_string(),
+            iat: Utc::now().timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::minutes(15)).timestamp() as usize,
+            prf: Uuid::now_v7().to_string(),
+            pex: (Utc::now() + chrono::Duration::minutes(5)).timestamp() as usize,
+            typ: token_type as u8,
+            roles: "user".to_string(),
+        }
+    }
 
     #[test]
     fn compare_hashes_accepts_correct_password() {
@@ -180,5 +215,81 @@ mod tests {
         let hash2 = generate_password_hash(password, &generate_salt()).unwrap();
 
         assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn compare_hashes_rejects_invalid_hash_input() {
+        let result = compare_password_hashes("not-a-phc-hash", "password".to_string());
+
+        assert!(matches!(result, Err(AuthError::HashingError(..))));
+    }
+
+    #[test]
+    fn validate_token_type_accepts_matching_type() {
+        let claims = make_refresh_claims(JwtTokenType::RefreshToken);
+
+        let actual = validate_token_type(&claims, JwtTokenType::RefreshToken);
+
+        assert!(actual);
+    }
+
+    #[test]
+    fn validate_token_type_rejects_wrong_type() {
+        let claims = make_refresh_claims(JwtTokenType::AccessToken);
+
+        let actual = validate_token_type(&claims, JwtTokenType::RefreshToken);
+
+        assert!(!actual);
+    }
+
+    #[test]
+    fn generate_claims_sets_subject_pairing_and_token_types() {
+        let user = make_test_user();
+        let expected_sub = user.uuid.to_string();
+
+        let actual = generate_claims(300, 900, user).unwrap();
+
+        assert_eq!(actual.access_claims.sub, expected_sub);
+        assert_eq!(actual.refresh_claims.sub, expected_sub);
+        assert_eq!(actual.access_claims.typ, JwtTokenType::AccessToken as u8);
+        assert_eq!(actual.refresh_claims.typ, JwtTokenType::RefreshToken as u8);
+        assert_eq!(actual.refresh_claims.prf, actual.access_claims.jti);
+        assert_eq!(actual.refresh_claims.pex, actual.access_claims.exp);
+    }
+
+    #[test]
+    fn generate_claims_preserves_user_roles() {
+        let user = make_test_user();
+
+        let actual = generate_claims(300, 900, user).unwrap();
+
+        assert_eq!(actual.access_claims.roles, "user,admin");
+        assert_eq!(actual.refresh_claims.roles, "user,admin");
+    }
+
+    #[test]
+    fn generate_claims_sets_expected_expiry_order() {
+        let user = make_test_user();
+
+        let actual = generate_claims(60, 300, user).unwrap();
+
+        assert!(actual.access_claims.exp > actual.access_claims.iat);
+        assert!(actual.refresh_claims.exp > actual.refresh_claims.iat);
+        assert!(actual.refresh_claims.exp > actual.access_claims.exp);
+    }
+
+    #[test]
+    fn encode_tokens_returns_non_empty_tokens() {
+        let claims = generate_claims(300, 900, make_test_user()).unwrap();
+
+        let actual = encode_tokens(
+            &test_encoding_key(),
+            claims.access_claims,
+            claims.refresh_claims,
+        )
+        .unwrap();
+
+        assert!(!actual.access_token.is_empty());
+        assert!(!actual.refresh_token.is_empty());
     }
 }
