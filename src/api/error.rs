@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::{Display, Formatter, Result};
 
-use crate::{
-    application::security::auth_error::AuthError, domain::errors::UserError,
-    infrastructure::database::database_error::DatabaseError,
-};
+use crate::{application::security::auth_error::AuthError, domain::errors::UserError};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -98,17 +95,6 @@ impl Display for ApiError {
 }
 
 impl std::error::Error for ApiError {}
-
-impl From<DatabaseError> for ApiError {
-    fn from(error: DatabaseError) -> Self {
-        tracing::error!(%error, "database error",);
-        Self {
-            message: "database operation failed".to_string(),
-            kind: ApiErrorKind::Internal,
-            detail: None,
-        }
-    }
-}
 
 impl From<UserError> for ApiError {
     fn from(err: UserError) -> Self {

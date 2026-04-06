@@ -163,7 +163,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         match self.redirect_cache.delete(&deleted_code).await {
             Ok(()) => Ok(delete_result),
             Err(e) => {
-                tracing::error!(%e, "Failed to invalidate cache after deleting record");
+                tracing::error!(%e, %deleted_code, "Failed to invalidate cache after deleting record");
                 Ok(delete_result)
             }
         }
@@ -182,6 +182,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
             if let Some(user) = self.users_repository.get_user_by_uuid(user_uuid).await? {
                 user_id = Some(user.id);
             } else {
+                tracing::error!(user_uuid = %user_uuid, "Failed to find user record for owned generated code redirect request");
                 return Err(ShortUrlError::NotFound(
                     "failed to find user creating a vanity url".to_string(),
                 ));
@@ -314,6 +315,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
             .await?
             .is_none_or(|user| user.id != short_owner_db_id)
         {
+            tracing::error!(%user_uuid, "vanity url update could not find user record of url owner");
             return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
         }
 
@@ -352,7 +354,10 @@ impl ShortUrlServiceTrait for ShortUrlService {
             }
         }?;
 
-        self.redirect_cache.delete(&old_code).await?;
+        self.redirect_cache.delete(&old_code).await.map_err(|e| {
+            tracing::error!(%e, "cache deletion of updated url failed");
+            e
+        })?;
 
         Ok(update_result)
     }
@@ -386,6 +391,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
                 {
                     tracing::error!(%e, ?decision, "failed to write redirect decision to cache");
                 }
+                // Cache set is best-effort: failure is logged but does not fail the operation
                 Ok(decision)
             }
             Some(short) => {
@@ -409,6 +415,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
                 {
                     tracing::error!(%e, ?decision, "failed to write redirect decision to cache");
                 }
+                // Cache set is best-effort: failure is logged but does not fail the operation
                 Ok(decision)
             }
         }
