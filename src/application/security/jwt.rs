@@ -67,7 +67,7 @@ impl Display for AccessClaims {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefreshClaims {
     /// Subject.
     pub sub: String,
