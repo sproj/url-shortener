@@ -5,7 +5,7 @@ use url_shortener::{
 };
 
 use crate::common::{
-    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_VANITY},
+    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN_BY_UUID, API_PATH_VANITY},
     helpers::create_user_and_login,
     test_app::TestApp,
 };
@@ -196,7 +196,7 @@ async fn vanity_url_is_associated_with_creating_user() {
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
 
     let get = client
-        .get(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .get(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .send()
         .await

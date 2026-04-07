@@ -4,11 +4,19 @@ use axum::{
     response::IntoResponse,
 };
 use tracing::instrument;
+use uuid::Uuid;
 
 use crate::{
-    api::{error::ApiError, handlers::auth::login_request::LoginRequest, swagger::LoginResponse},
+    api::{
+        error::ApiError,
+        handlers::{auth::login_request::LoginRequest, users::user_response::UserResponse},
+        swagger::LoginResponse,
+    },
     application::{
-        security::jwt::{AccessClaims, JwtTokens, RefreshClaims, tokens_to_response},
+        security::{
+            auth_error::AuthError,
+            jwt::{AccessClaims, JwtTokens, RefreshClaims, tokens_to_response},
+        },
         service::user::login_params::LoginParams,
         state::SharedState,
     },
@@ -61,6 +69,7 @@ pub async fn logout(
     State(state): State<SharedState>,
     access_claims: AccessClaims,
 ) -> Result<(), ApiError> {
+    tracing::debug!(sub=&access_claims.sub, jti=%&access_claims.jti, "logging out");
     state
         .auth_service
         .revoke_refresh(&access_claims.jti)
@@ -84,7 +93,40 @@ pub async fn refresh(
     State(state): State<SharedState>,
     refresh_claims: RefreshClaims,
 ) -> Result<Json<JwtTokens>, ApiError> {
+    tracing::debug!(sub=&refresh_claims.sub, jti=%&refresh_claims.jti, prf=%&refresh_claims.prf, "refreshing claims");
     let tokens = state.auth_service.refresh(refresh_claims).await?;
 
     Ok(Json(tokens))
+}
+
+#[utoipa::path(
+    post,
+    path = "/me",
+    tag = "auth",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Your user response", body = UserResponse),
+        (status = 401, description = "Refresh token is missing, expired, or invalid", body = ApiError),
+        (status = 500, description = "Unexpected error", body = ApiError)
+    )
+)]
+#[instrument(skip(state, access_claims))]
+pub async fn user_info(
+    State(state): State<SharedState>,
+    access_claims: AccessClaims,
+) -> Result<Json<UserResponse>, ApiError> {
+    tracing::debug!(
+        sub = &access_claims.sub,
+        jti = &access_claims.jti,
+        "reading user info"
+    );
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|e| {
+        tracing::warn!(%access_claims.sub, %e, "failed to parse uuid from access token sub");
+        AuthError::InvalidToken
+    })?;
+    if let Some(user) = state.user_service.get_one_by_uuid(user_uuid).await? {
+        Ok(Json(user.into()))
+    } else {
+        Err(ApiError::from(UserError::NotFound(user_uuid.to_string())))
+    }
 }

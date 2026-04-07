@@ -9,6 +9,7 @@ use axum_extra::{
     TypedHeader,
     headers::{Authorization, authorization::Bearer},
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     api::error::ApiError,
@@ -44,6 +45,29 @@ where
         decode_token_from_request_part(parts, state)
             .await
             .map_err(ApiError::from)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptionalAccessClaims(pub Option<AccessClaims>);
+
+impl<S> FromRequestParts<S> for OptionalAccessClaims
+where
+    SharedState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        if parts
+            .headers
+            .contains_key(axum::http::header::AUTHORIZATION)
+        {
+            let claims = decode_token_from_request_part(parts, state).await?;
+            Ok(OptionalAccessClaims(Some(claims)))
+        } else {
+            Ok(OptionalAccessClaims(None))
+        }
     }
 }
 

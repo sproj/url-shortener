@@ -8,7 +8,9 @@ use url_shortener::{
 };
 
 use crate::common::{
-    constants::{API_PATH_LOGIN, API_PATH_LOGOUT, API_PATH_REFRESH, API_PATH_USERS},
+    constants::{
+        API_PATH_LOGIN, API_PATH_LOGOUT, API_PATH_REFRESH, API_PATH_SHORTEN, API_PATH_USERS,
+    },
     test_app::TestApp,
     test_redis,
 };
@@ -940,4 +942,20 @@ async fn replay_token_refresh_unauthorized() {
         .unwrap();
 
     assert_eq!(replay_res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn optional_acces_claims_endpoints_reject_invalid_tokens() {
+    let sut = TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let actual = client
+        .post(sut.build_path(API_PATH_SHORTEN))
+        .bearer_auth("Bearer not.a.token")
+        .json("doesn't matter")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(actual.status(), StatusCode::UNAUTHORIZED);
 }

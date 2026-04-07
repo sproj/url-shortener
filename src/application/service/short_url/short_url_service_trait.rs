@@ -19,12 +19,6 @@ use crate::{
 pub trait ShortUrlServiceTrait: Send + Sync {
     async fn get_all(&self) -> Result<Vec<ShortUrl>, ShortUrlError>;
     async fn get_by_uuid(&self, uuid: Uuid) -> Result<Option<ShortUrl>, ShortUrlError>;
-    async fn get_by_uuid_for_user(
-        &self,
-        uuid: Uuid,
-        user_uuid: Uuid,
-        is_admin: bool,
-    ) -> Result<Option<ShortUrl>, ShortUrlError>;
     async fn get_by_code(&self, code: &str) -> Result<Option<ShortUrl>, ShortUrlError>;
     async fn delete_one_by_uuid(
         &self,
@@ -46,6 +40,7 @@ pub trait ShortUrlServiceTrait: Send + Sync {
         &self,
         short_uuid: Uuid,
         user_uuid: Uuid,
+        is_admin: bool,
         dto: ValidatedUpdateShortUrlRequest,
     ) -> Result<ShortUrl, ShortUrlError>;
     async fn resolve_redirect_decision(
