@@ -7,10 +7,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::{Display, Formatter, Result};
+use utoipa::ToSchema;
 
 use crate::{application::security::auth_error::AuthError, domain::errors::UserError};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum ApiErrorKind {
@@ -56,7 +57,7 @@ impl ApiErrorKind {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiError {
     pub kind: ApiErrorKind,
     pub message: String,

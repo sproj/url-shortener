@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 // Serde cannot distinguish a missing field from an explicit `null` for `Option<T>` — both
 // deserialize as `None`. For `expires_at` we need that distinction: a missing field means
@@ -15,10 +16,11 @@ where
     Ok(Some(Option::deserialize(d)?))
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, ToSchema)]
 pub struct UpdateShortUrlRequest {
     pub long_url: Option<String>,
     #[serde(default, deserialize_with = "deserialize_double_option")]
+    #[schema(nullable)]
     pub expires_at: Option<Option<DateTime<Utc>>>,
     pub code: Option<String>,
 }

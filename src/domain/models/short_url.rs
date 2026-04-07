@@ -3,12 +3,13 @@ use std::fmt::{Display, Formatter};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
+use utoipa::ToSchema;
 
 use crate::{
     domain::errors::RepositoryError, infrastructure::database::database_error::DatabaseError,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ShortUrl {
     pub id: i64,
     pub uuid: uuid::Uuid,

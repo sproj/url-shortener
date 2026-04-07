@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     domain::{errors::ShortUrlError, validation_issue::ValidationIssue},
 };
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, ToSchema)]
 pub struct CreateVanityUrlRequest {
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,

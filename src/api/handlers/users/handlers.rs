@@ -22,6 +22,18 @@ use crate::{
     domain::errors::UserError,
 };
 
+#[utoipa::path(
+    get,
+    path = "/users",
+    tag = "users",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "List all users", body = [UserResponse]),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Admin role required", body = ApiError),
+        (status = 500, description = "Unexpected data access error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn get_all(
     State(state): State<SharedState>,
@@ -32,6 +44,22 @@ pub async fn get_all(
     Ok(Json(users.into_iter().map(UserResponse::from).collect()))
 }
 
+#[utoipa::path(
+    get,
+    path = "/users/{uuid}",
+    tag = "users",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "User UUID")
+    ),
+    responses(
+        (status = 200, description = "User found", body = UserResponse),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 404, description = "User was not found", body = ApiError),
+        (status = 500, description = "Unexpected data access error", body = ApiError)
+    )
+)]
 #[instrument(skip(state))]
 pub async fn get_one_by_uuid(
     State(state): State<SharedState>,
@@ -52,6 +80,21 @@ pub async fn get_one_by_uuid(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/users/{uuid}",
+    tag = "users",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "User UUID")
+    ),
+    responses(
+        (status = 200, description = "User deleted", body = String),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 500, description = "Unexpected deletion error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn delete_one_by_uuid(
     State(state): State<SharedState>,
@@ -65,6 +108,23 @@ pub async fn delete_one_by_uuid(
     Ok(Json(subject_uuid.to_string()))
 }
 
+#[utoipa::path(
+    put,
+    path = "/users/{uuid}/password",
+    tag = "users",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "User UUID")
+    ),
+    request_body = UpdatePasswordRequest,
+    responses(
+        (status = 200, description = "Password updated"),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 422, description = "Request body could not be parsed", body = ApiError),
+        (status = 500, description = "Unexpected update error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims, req_payload))]
 pub async fn update_password(
     State(state): State<SharedState>,
@@ -85,6 +145,19 @@ pub async fn update_password(
     Ok(StatusCode::OK)
 }
 
+#[utoipa::path(
+    post,
+    path = "/users",
+    tag = "users",
+    request_body = CreateUserRequest,
+    responses(
+        (status = 201, description = "User created", body = UserResponse),
+        (status = 400, description = "Request content failed validation", body = ApiError),
+        (status = 409, description = "User already exists", body = ApiError),
+        (status = 422, description = "Request body could not be parsed", body = ApiError),
+        (status = 500, description = "Unexpected creation error", body = ApiError)
+    )
+)]
 #[instrument(skip(state))]
 pub async fn create_user(
     State(state): State<SharedState>,

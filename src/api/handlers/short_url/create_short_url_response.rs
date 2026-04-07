@@ -2,11 +2,12 @@ use std::fmt::{Display, Formatter, Result};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domain::models::short_url::ShortUrl;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct CreateShortUrlResponse {
     pub uuid: Uuid,
     pub code: String,

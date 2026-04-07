@@ -6,7 +6,7 @@ use axum::{
 use tracing::instrument;
 
 use crate::{
-    api::{error::ApiError, handlers::auth::login_request::LoginRequest},
+    api::{error::ApiError, handlers::auth::login_request::LoginRequest, swagger::LoginResponse},
     application::{
         security::jwt::{AccessClaims, JwtTokens, RefreshClaims, tokens_to_response},
         service::user::login_params::LoginParams,
@@ -15,6 +15,18 @@ use crate::{
     domain::errors::UserError,
 };
 
+#[utoipa::path(
+    post,
+    path = "/login",
+    tag = "auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Authenticated successfully", body = LoginResponse),
+        (status = 401, description = "Credentials are invalid", body = ApiError),
+        (status = 422, description = "Request body could not be parsed", body = ApiError),
+        (status = 500, description = "Unexpected authentication error", body = ApiError)
+    )
+)]
 #[instrument(skip(state))]
 pub async fn login(
     State(state): State<SharedState>,
@@ -33,6 +45,17 @@ pub async fn login(
     Ok(res)
 }
 
+#[utoipa::path(
+    post,
+    path = "/logout",
+    tag = "auth",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Refresh token revoked"),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 500, description = "Unexpected token revocation error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, access_claims))]
 pub async fn logout(
     State(state): State<SharedState>,
@@ -45,6 +68,17 @@ pub async fn logout(
         .map_err(ApiError::from)
 }
 
+#[utoipa::path(
+    post,
+    path = "/refresh",
+    tag = "auth",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Issued a fresh access and refresh token pair", body = JwtTokens),
+        (status = 401, description = "Refresh token is missing, expired, or invalid", body = ApiError),
+        (status = 500, description = "Unexpected token refresh error", body = ApiError)
+    )
+)]
 #[instrument(skip(state, refresh_claims))]
 pub async fn refresh(
     State(state): State<SharedState>,

@@ -1,10 +1,11 @@
 use std::fmt::Debug;
 
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::application::service::user::create_user_params::CreateUserParams;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateUserRequest {
     pub username: String,
     pub email: String,

@@ -11,6 +11,20 @@ use crate::{
     domain::errors::ShortUrlError,
 };
 
+#[utoipa::path(
+    get,
+    path = "/r/{code}",
+    tag = "redirect",
+    params(
+        ("code" = String, Path, description = "Short code to resolve")
+    ),
+    responses(
+        (status = 301, description = "Permanent redirect for GET requests"),
+        (status = 302, description = "Temporary redirect for GET requests"),
+        (status = 404, description = "Short code was not found", body = ApiError),
+        (status = 410, description = "Short code exists but is gone")
+    )
+)]
 #[instrument(skip(state))]
 pub async fn redirect(
     State(state): State<SharedState>,

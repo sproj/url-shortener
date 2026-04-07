@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     api::handlers::short_url::input_validation_rules::{
@@ -9,7 +10,7 @@ use crate::{
     domain::{errors::ShortUrlError, validation_issue::ValidationIssue},
 };
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, ToSchema)]
 pub struct CreateShortUrlRequest {
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,

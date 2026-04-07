@@ -1,4 +1,4 @@
-mod handlers;
+pub mod handlers;
 
 mod create_short_url_request;
 mod create_short_url_response;
