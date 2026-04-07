@@ -172,6 +172,7 @@ impl AuthServiceTrait for AuthService {
 
     #[instrument(skip(self))]
     async fn revoke_refresh(&self, access_token_jti: &str) -> Result<(), AuthError> {
+        tracing::debug!(%access_token_jti, "revoking access token");
         self.refresh_token_cache
             .revoke(access_token_jti)
             .await

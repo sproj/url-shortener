@@ -61,6 +61,7 @@ pub async fn logout(
     State(state): State<SharedState>,
     access_claims: AccessClaims,
 ) -> Result<(), ApiError> {
+    tracing::debug!(sub=&access_claims.sub, jti=%&access_claims.jti, "logging out");
     state
         .auth_service
         .revoke_refresh(&access_claims.jti)
@@ -84,6 +85,7 @@ pub async fn refresh(
     State(state): State<SharedState>,
     refresh_claims: RefreshClaims,
 ) -> Result<Json<JwtTokens>, ApiError> {
+    tracing::debug!(sub=&refresh_claims.sub, jti=%&refresh_claims.jti, prf=%&refresh_claims.prf, "refreshing claims");
     let tokens = state.auth_service.refresh(refresh_claims).await?;
 
     Ok(Json(tokens))
