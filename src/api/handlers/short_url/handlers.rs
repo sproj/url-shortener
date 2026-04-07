@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{
     api::{
         error::ApiError,
+        extractors::OptionalAccessClaims,
         handlers::short_url::{
             CreateShortUrlRequest, CreateShortUrlResponse, CreateVanityUrlRequest,
             UpdateShortUrlRequest,
@@ -63,6 +64,7 @@ pub async fn get_all(
 #[instrument(skip(state))]
 pub async fn create_short_url(
     State(state): State<SharedState>,
+    optional_acces_claims: OptionalAccessClaims,
     req_payload: Result<Json<CreateShortUrlRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateShortUrlResponse>), ApiError> {
     // if payload argument is `Json(payload): Json<CreateShortUrl>`
@@ -72,7 +74,14 @@ pub async fn create_short_url(
     let Json(parsed_input) =
         req_payload.map_err(|e| ShortUrlError::UnprocessableInput(e.to_string()))?;
 
-    let dto: ValidatedCreateShortUrlRequest = parsed_input.try_into().map_err(ApiError::from)?;
+    let mut dto: ValidatedCreateShortUrlRequest =
+        parsed_input.try_into().map_err(ApiError::from)?;
+
+    if let Some(claims) = optional_acces_claims.0 {
+        let user_uuid = Uuid::parse_str(&claims.sub)
+            .map_err(|_| ApiError::from(AuthError::IncorrectCredentials))?;
+        dto.user_uuid = Some(user_uuid);
+    }
 
     let created = state.short_url_service.add_generated_code(dto).await?;
 
@@ -129,33 +138,22 @@ pub async fn create_vanity_url(
     get,
     path = "/shorten/uuid/{uuid}",
     tag = "short-url",
-    security(("bearerAuth" = [])),
     params(
         ("uuid" = Uuid, Path, description = "Short URL UUID")
     ),
     responses(
         (status = 200, description = "Short URL found", body = ShortUrl),
-        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
-        (status = 403, description = "Resource access is forbidden", body = ApiError),
         (status = 404, description = "Short URL was not found", body = ApiError),
         (status = 500, description = "Unexpected data access error", body = ApiError)
     )
 )]
-#[instrument(skip(state, access_claims))]
+#[instrument(skip(state))]
 pub async fn get_one_by_uuid(
-    access_claims: AccessClaims,
     State(state): State<SharedState>,
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<ShortUrl>, ApiError> {
-    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
-    let is_admin = access_claims.validate_role_admin().is_ok();
-
     tracing::debug!(%uuid, "get one by uuid");
-    if let Some(short) = state
-        .short_url_service
-        .get_by_uuid_for_user(uuid, user_uuid, is_admin)
-        .await?
-    {
+    if let Some(short) = state.short_url_service.get_by_uuid(uuid).await? {
         tracing::debug!(?short, "ok");
         Ok(Json(short))
     } else {
@@ -199,9 +197,11 @@ pub async fn update_one_by_uuid(
         tracing::warn!(%e, "failed to parse a sub to a uuid from a parsed access token");
         AuthError::InvalidToken
     })?;
+
+    let is_admin = access_claims.validate_role_admin().is_ok();
     let updated = state
         .short_url_service
-        .update_one_by_uuid(uuid, user_uuid, dto)
+        .update_one_by_uuid(uuid, user_uuid, is_admin, dto)
         .await?;
 
     let payload: CreateShortUrlResponse = CreateShortUrlResponse::from(updated);
@@ -246,17 +246,24 @@ pub async fn delete_one_by_uuid(
     }
 }
 
-// Note: this handler is not currently registered in any route. Auth is added here for
-// consistency so it is ready when the route is wired up.
-#[instrument(skip(state, access_claims))]
+#[utoipa::path(
+    get,
+    path = "/shorten/code/{code}",
+    tag = "short-url",
+    params(
+        ("code" = String, Path, description = "Short URL code")
+    ),
+    responses(
+        (status = 200, description = "Short URL found", body = ShortUrl),
+        (status = 404, description = "Short URL was not found", body = ApiError),
+        (status = 500, description = "Unexpected data access error", body = ApiError)
+    )
+)]
+#[instrument(skip(state))]
 pub async fn get_one_by_code(
-    access_claims: AccessClaims,
     State(state): State<SharedState>,
     Path(code): Path<String>,
 ) -> Result<Json<ShortUrl>, ApiError> {
-    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
-    let is_admin = access_claims.validate_role_admin().is_ok();
-
     tracing::debug!(%code, "get one by code");
     match state.short_url_service.get_by_code(&code).await? {
         None => {
@@ -264,10 +271,6 @@ pub async fn get_one_by_code(
             Err(ApiError::from(ShortUrlError::NotFound(code)))
         }
         Some(short) => {
-            state
-                .short_url_service
-                .get_by_uuid_for_user(short.uuid, user_uuid, is_admin)
-                .await?;
             tracing::debug!(%short, "ok");
             Ok(Json(short))
         }

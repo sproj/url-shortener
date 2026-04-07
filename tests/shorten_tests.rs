@@ -1,6 +1,6 @@
 use crate::common::{
-    constants::{API_PATH_SHORTEN, API_PATH_SHORTEN_BY_UUID},
-    helpers::{login_as_admin, pick_error_fields},
+    constants::{API_PATH_SHORTEN, API_PATH_SHORTEN_BY_CODE, API_PATH_SHORTEN_BY_UUID},
+    helpers::{create_user_and_login, login_as_admin, pick_error_fields},
     test_app,
 };
 use axum::http::StatusCode;
@@ -39,6 +39,81 @@ async fn create_shorturl_from_input_succeeds() {
 }
 
 #[tokio::test]
+async fn create_shorturl_as_logged_in_user_assigns_ownership() {
+    let sut = test_app::TestApp::builder().build().await;
+
+    let url = sut.build_path(API_PATH_SHORTEN);
+
+    let client = reqwest::Client::new();
+
+    let expected = "http://create_shorturl_as_logged_in_user_assigns_ownership.me".to_string();
+    let input = serde_json::json!( {
+        "long_url": expected,
+        "expires_at": null,
+    });
+
+    let token = create_user_and_login(
+        &client,
+        &sut,
+        "create_shorturl_as_logged_in_user_assigns_ownership",
+    )
+    .await;
+
+    let res = client
+        .post(url)
+        .bearer_auth(&token)
+        .json(&input)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let create_result = res.json::<CreateShortUrlResponse>().await.unwrap();
+    assert_eq!(create_result.long_url, expected);
+
+    let get_by_uuid_url = sut.build_path(&format!(
+        "{}/{}",
+        API_PATH_SHORTEN_BY_UUID, create_result.uuid
+    ));
+
+    let get_response = client.get(get_by_uuid_url).send().await.unwrap();
+    let actual = get_response.json::<ShortUrl>().await.unwrap();
+    assert!(actual.user_id.is_some());
+}
+
+#[tokio::test]
+async fn create_shorturl_as_anonymous_user_assigns_no_ownership() {
+    let sut = test_app::TestApp::builder().build().await;
+
+    let url = sut.build_path(API_PATH_SHORTEN);
+
+    let client = reqwest::Client::new();
+
+    let expected = "http://create_shorturl_as_anonymous_user_assigns_no_ownership.me".to_string();
+    let input = serde_json::json!( {
+        "long_url": expected,
+        "expires_at": null,
+    });
+
+    let res = client.post(url).json(&input).send().await.unwrap();
+
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let create_result = res.json::<CreateShortUrlResponse>().await.unwrap();
+    assert_eq!(create_result.long_url, expected);
+
+    let get_by_uuid_url = sut.build_path(&format!(
+        "{}/{}",
+        API_PATH_SHORTEN_BY_UUID, create_result.uuid
+    ));
+
+    let get_response = client.get(get_by_uuid_url).send().await.unwrap();
+    let actual = get_response.json::<ShortUrl>().await.unwrap();
+    assert!(actual.user_id.is_none());
+}
+
+#[tokio::test]
 async fn get_after_create_shorturl_succeeds() {
     let sut = test_app::TestApp::builder().build().await;
 
@@ -56,17 +131,10 @@ async fn get_after_create_shorturl_succeeds() {
     assert_eq!(create.status(), StatusCode::CREATED);
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
 
-    // Anonymous short URLs are owned by nobody — only admin can read their metadata
-    let token = login_as_admin(&client, &sut).await;
     let get_by_id_url =
         sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
 
-    let read = client
-        .get(get_by_id_url)
-        .bearer_auth(&token)
-        .send()
-        .await
-        .unwrap();
+    let read = client.get(get_by_id_url).send().await.unwrap();
 
     assert_eq!(read.status(), StatusCode::OK);
 
@@ -315,13 +383,113 @@ async fn input_url_cannot_contain_password() {
 }
 
 #[tokio::test]
-async fn delete_shorturl_by_id_succeeds() {
+async fn delete_shorturl_by_id_succeeds_for_owner() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
     let create_url = sut.build_path(API_PATH_SHORTEN);
 
-    let expected = "http://delete.me";
+    let expected = "http://delete_shorturl_by_id_succeeds_for_owner.me";
+    let input = serde_json::json!( {
+        "long_url": expected.to_string(),
+        "expires_at": null,
+    });
+
+    let token =
+        create_user_and_login(&client, &sut, "delete_shorturl_by_id_succeeds_for_owner").await;
+
+    let create = client
+        .post(create_url)
+        .bearer_auth(&token)
+        .json(&input)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+
+    let created = create.json::<CreateShortUrlResponse>().await.unwrap();
+
+    let url_with_id_path_param =
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
+
+    let get_response = client
+        .get(url_with_id_path_param.clone())
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(get_response.status(), StatusCode::OK);
+
+    let get_result = get_response.json::<ShortUrl>().await.unwrap();
+
+    assert!(get_result.user_id.is_some());
+
+    let delete = client
+        .delete(url_with_id_path_param)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(delete.status(), StatusCode::OK);
+
+    let delete_response = delete.json::<String>().await.unwrap();
+    assert_eq!(delete_response, created.uuid.to_string());
+}
+
+#[tokio::test]
+async fn delete_shorturl_by_id_succeeds_for_admin() {
+    let sut = test_app::TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let create_url = sut.build_path(API_PATH_SHORTEN);
+
+    let expected = "http://delete_shorturl_by_id_succeeds_for_admin.me";
+    let input = serde_json::json!( {
+        "long_url": expected.to_string(),
+        "expires_at": null,
+    });
+
+    let token =
+        create_user_and_login(&client, &sut, "delete_shorturl_by_id_succeeds_for_admin").await;
+
+    let create = client
+        .post(create_url)
+        .bearer_auth(&token)
+        .json(&input)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+
+    let created = create.json::<CreateShortUrlResponse>().await.unwrap();
+    let url_with_id_path_param =
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
+    let admin_token = login_as_admin(&client, &sut).await;
+
+    let delete = client
+        .delete(url_with_id_path_param)
+        .bearer_auth(&admin_token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(delete.status(), StatusCode::OK);
+
+    let delete_response = delete.json::<String>().await.unwrap();
+    assert_eq!(delete_response, created.uuid.to_string());
+}
+
+#[tokio::test]
+async fn delete_shorturl_fails_for_anonymous_user() {
+    let sut = test_app::TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let create_url = sut.build_path(API_PATH_SHORTEN);
+
+    let expected = "http://delete_shorturl_by_id_fails_for_anonymous_user.me";
     let input = serde_json::json!( {
         "long_url": expected.to_string(),
         "expires_at": null,
@@ -335,19 +503,54 @@ async fn delete_shorturl_by_id_succeeds() {
     let url_with_id_path_param =
         sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
 
-    // Anonymous short URLs have no owner — only admin can delete them
-    let token = login_as_admin(&client, &sut).await;
-    let delete = client
-        .delete(url_with_id_path_param)
-        .bearer_auth(&token)
+    let delete = client.delete(url_with_id_path_param).send().await.unwrap();
+
+    assert_eq!(delete.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn delete_shorturl_by_id_fails_for_non_owning_user() {
+    let sut = test_app::TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let create_url = sut.build_path(API_PATH_SHORTEN);
+
+    let expected = "http://delete_shorturl_by_id_fails_for_non_owning_user.me";
+    let input = serde_json::json!( {
+        "long_url": expected.to_string(),
+        "expires_at": null,
+    });
+
+    let creator_token = create_user_and_login(
+        &client,
+        &sut,
+        "delete_shorturl_by_id_fails_for_non_owning_user",
+    )
+    .await;
+
+    let create = client
+        .post(create_url)
+        .bearer_auth(&creator_token)
+        .json(&input)
         .send()
         .await
         .unwrap();
 
-    assert_eq!(delete.status(), StatusCode::OK);
+    assert_eq!(create.status(), StatusCode::CREATED);
 
-    let delete_response = delete.json::<String>().await.unwrap();
-    assert_eq!(delete_response, created.uuid.to_string());
+    let created = create.json::<CreateShortUrlResponse>().await.unwrap();
+    let url_with_id_path_param =
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
+
+    let evil_doer_token = create_user_and_login(&client, &sut, "i_love_deleting_others_urls").await;
+    let delete = client
+        .delete(url_with_id_path_param)
+        .bearer_auth(&evil_doer_token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(delete.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
@@ -379,4 +582,52 @@ async fn delete_shorturl_by_nosuch_id_returns_404() {
     let res = client.delete(url).bearer_auth(&token).send().await.unwrap();
 
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_by_code_succeeds() {
+    let sut = test_app::TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let expected = "http://get.me/get_by_code_succeeds.com";
+    let input = serde_json::json!( {
+        "long_url": expected.to_string(),
+        "expires_at": null,
+    });
+
+    let create_url = sut.build_path(API_PATH_SHORTEN);
+    let create = client.post(create_url).json(&input).send().await.unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+
+    let created = create.json::<CreateShortUrlResponse>().await.unwrap();
+
+    let url_with_code_path_param =
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_CODE, created.code).as_str());
+
+    let res = client.get(url_with_code_path_param).send().await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let actual = res.json::<CreateShortUrlResponse>().await.unwrap();
+
+    assert_eq!(actual.uuid, created.uuid);
+    assert_eq!(actual.code, created.code);
+    assert_eq!(actual.long_url, created.long_url);
+}
+
+#[tokio::test]
+async fn get_shorturl_by_nosuch_code_returns_404() {
+    let sut = test_app::TestApp::builder().build().await;
+    let client = reqwest::Client::new();
+
+    let token = login_as_admin(&client, &sut).await;
+    let no_such_code = "no-such-code-no-sir-not-here";
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_CODE, no_such_code).as_str());
+
+    let res = client.get(url).bearer_auth(&token).send().await.unwrap();
+    let status = res.status();
+    let err: ApiError = res.json().await.unwrap();
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(err.kind, ApiErrorKind::ResourceNotFound);
 }

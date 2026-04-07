@@ -58,7 +58,7 @@ impl ShortUrlService {
     }
 
     /// Asserts that `user_uuid` owns `short` or is an admin.
-    /// Anonymous short URLs (no `user_id`) are accessible by admins only.
+    /// Anonymous short URLs (no `user_id`) can be deleted or updated by admins only.
     async fn require_owner_or_admin(
         &self,
         short: &ShortUrl,
@@ -103,28 +103,6 @@ impl ShortUrlServiceTrait for ShortUrlService {
             .get_by_uuid(short_url_uuid)
             .await
             .map_err(ShortUrlError::Storage)
-    }
-
-    /// Like `get_by_uuid` but enforces that the caller either owns the URL or is an admin.
-    /// Anonymous short URLs (no `user_id`) are accessible by admins only.
-    #[instrument(skip(self))]
-    async fn get_by_uuid_for_user(
-        &self,
-        short_url_uuid: Uuid,
-        user_uuid: Uuid,
-        is_admin: bool,
-    ) -> Result<Option<ShortUrl>, ShortUrlError> {
-        let short = match self
-            .short_url_repository
-            .get_by_uuid(short_url_uuid)
-            .await?
-        {
-            None => return Ok(None),
-            Some(s) => s,
-        };
-        self.require_owner_or_admin(&short, user_uuid, is_admin)
-            .await?;
-        Ok(Some(short))
     }
 
     #[instrument(skip(self))]
@@ -291,6 +269,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         &self,
         short_uuid: Uuid,
         user_uuid: Uuid,
+        is_admin: bool,
         dto: ValidatedUpdateShortUrlRequest,
     ) -> Result<ShortUrl, ShortUrlError> {
         let short = match self.short_url_repository.get_by_uuid(short_uuid).await? {
@@ -301,6 +280,9 @@ impl ShortUrlServiceTrait for ShortUrlService {
             }
             Some(short) => short,
         };
+
+        self.require_owner_or_admin(&short, user_uuid, is_admin)
+            .await?;
 
         let short_owner_db_id = match short.user_id {
             Some(user_db_id) => user_db_id,
@@ -632,35 +614,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_by_uuid_for_user_returns_owned_short_url() {
-        let user_uuid = Uuid::now_v7();
-        let user = make_user(7, user_uuid);
-        let short = make_short(Uuid::now_v7(), "owned-code", Some(user.id));
-        let sut = make_service(vec![short.clone()], vec![user], vec!["unused-code"]);
+    async fn get_by_code_returns_added_short_url() {
+        let created = make_short(Uuid::now_v7(), "get-by-code", None);
+        let sut = make_service(vec![created.clone()], vec![], vec!["unused-code"]);
 
-        let actual = sut
-            .get_by_uuid_for_user(short.uuid, user_uuid, false)
-            .await
-            .unwrap();
+        let actual = sut.get_by_code(&created.code).await.unwrap();
 
         assert!(actual.is_some());
-        assert_eq!(actual.unwrap().uuid, short.uuid);
-    }
-
-    #[tokio::test]
-    async fn get_by_uuid_for_user_returns_unauthorized_for_non_owner() {
-        let owner = make_user(7, Uuid::now_v7());
-        let short = make_short(Uuid::now_v7(), "owned-code", Some(owner.id));
-        let sut = make_service(vec![short.clone()], vec![owner], vec!["unused-code"]);
-
-        let actual = sut
-            .get_by_uuid_for_user(short.uuid, Uuid::now_v7(), false)
-            .await;
-
-        assert!(matches!(
-            actual.unwrap_err(),
-            ShortUrlError::Unauthorized(AuthError::Forbidden)
-        ));
+        let actual = actual.unwrap();
+        assert_eq!(actual.uuid, created.uuid);
+        assert_eq!(actual.code, created.code);
     }
 
     #[tokio::test]
@@ -718,6 +681,7 @@ mod tests {
             .update_one_by_uuid(
                 short.uuid,
                 user_uuid,
+                false,
                 ValidatedUpdateShortUrlRequest {
                     long_url: Some("https://example.com/new-target".to_string()),
                     expires_at: Some(None),
@@ -743,6 +707,7 @@ mod tests {
             .update_one_by_uuid(
                 short.uuid,
                 Uuid::now_v7(),
+                false,
                 ValidatedUpdateShortUrlRequest {
                     long_url: Some("https://example.com/new-target".to_string()),
                     expires_at: None,
