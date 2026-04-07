@@ -4,8 +4,11 @@ use axum::{
 };
 
 use crate::{
-    api::handlers::users::handlers::{
-        create_user, delete_one_by_uuid, get_all, get_one_by_uuid, update_password,
+    api::handlers::{
+        auth::auth_handlers::user_info,
+        users::handlers::{
+            create_user, delete_one_by_uuid, get_all, get_one_by_uuid, update_password,
+        },
     },
     application::state::SharedState,
 };
@@ -17,4 +20,5 @@ pub fn routes() -> Router<SharedState> {
         .route("/{uuid}", get(get_one_by_uuid))
         .route("/{uuid}", delete(delete_one_by_uuid))
         .route("/{uuid}/password", put(update_password))
+        .route("/me", get(user_info))
 }
