@@ -1,5 +1,5 @@
 use crate::common::{
-    constants::API_PATH_SHORTEN,
+    constants::{API_PATH_SHORTEN, API_PATH_SHORTEN_BY_UUID},
     helpers::{login_as_admin, pick_error_fields},
     test_app,
 };
@@ -58,7 +58,8 @@ async fn get_after_create_shorturl_succeeds() {
 
     // Anonymous short URLs are owned by nobody — only admin can read their metadata
     let token = login_as_admin(&client, &sut).await;
-    let get_by_id_url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str());
+    let get_by_id_url =
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
 
     let read = client
         .get(get_by_id_url)
@@ -332,7 +333,7 @@ async fn delete_shorturl_by_id_succeeds() {
 
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
     let url_with_id_path_param =
-        sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str());
+        sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
 
     // Anonymous short URLs have no owner — only admin can delete them
     let token = login_as_admin(&client, &sut).await;
@@ -356,7 +357,7 @@ async fn get_shorturl_by_nosuch_id_returns_404() {
 
     let token = login_as_admin(&client, &sut).await;
     let no_such_id = Uuid::nil();
-    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, no_such_id).as_str());
 
     let res = client.get(url).bearer_auth(&token).send().await.unwrap();
     let status = res.status();
@@ -373,7 +374,7 @@ async fn delete_shorturl_by_nosuch_id_returns_404() {
 
     let token = login_as_admin(&client, &sut).await;
     let no_such_id = Uuid::nil();
-    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN, no_such_id).as_str());
+    let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, no_such_id).as_str());
 
     let res = client.delete(url).bearer_auth(&token).send().await.unwrap();
 

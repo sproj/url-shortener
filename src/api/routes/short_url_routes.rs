@@ -16,7 +16,7 @@ pub fn routes() -> Router<SharedState> {
         .route("/", get(get_all))
         .route("/vanity", post(create_vanity_url))
         .route("/", post(create_short_url))
-        .route("/{uuid}", get(get_one_by_uuid))
-        .route("/{uuid}", delete(delete_one_by_uuid))
-        .route("/{uuid}", patch(update_one_by_uuid))
+        .route("/uuid/{uuid}", get(get_one_by_uuid))
+        .route("/uuid/{uuid}", delete(delete_one_by_uuid))
+        .route("/uuid/{uuid}", patch(update_one_by_uuid))
 }

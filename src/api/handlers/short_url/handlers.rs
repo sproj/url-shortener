@@ -49,73 +49,6 @@ pub async fn get_all(
 }
 
 #[utoipa::path(
-    get,
-    path = "/shorten/{uuid}",
-    tag = "short-url",
-    security(("bearerAuth" = [])),
-    params(
-        ("uuid" = Uuid, Path, description = "Short URL UUID")
-    ),
-    responses(
-        (status = 200, description = "Short URL found", body = ShortUrl),
-        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
-        (status = 403, description = "Resource access is forbidden", body = ApiError),
-        (status = 404, description = "Short URL was not found", body = ApiError),
-        (status = 500, description = "Unexpected data access error", body = ApiError)
-    )
-)]
-#[instrument(skip(state, access_claims))]
-pub async fn get_one_by_uuid(
-    access_claims: AccessClaims,
-    State(state): State<SharedState>,
-    Path(uuid): Path<Uuid>,
-) -> Result<Json<ShortUrl>, ApiError> {
-    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
-    let is_admin = access_claims.validate_role_admin().is_ok();
-
-    tracing::debug!(%uuid, "get one by uuid");
-    if let Some(short) = state
-        .short_url_service
-        .get_by_uuid_for_user(uuid, user_uuid, is_admin)
-        .await?
-    {
-        tracing::debug!(?short, "ok");
-        Ok(Json(short))
-    } else {
-        tracing::warn!(%uuid, "not found");
-        Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
-    }
-}
-
-// Note: this handler is not currently registered in any route. Auth is added here for
-// consistency so it is ready when the route is wired up.
-#[instrument(skip(state, access_claims))]
-pub async fn get_one_by_code(
-    access_claims: AccessClaims,
-    State(state): State<SharedState>,
-    Path(code): Path<String>,
-) -> Result<Json<ShortUrl>, ApiError> {
-    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
-    let is_admin = access_claims.validate_role_admin().is_ok();
-
-    tracing::debug!(%code, "get one by code");
-    match state.short_url_service.get_by_code(&code).await? {
-        None => {
-            tracing::warn!(%code, "not found");
-            Err(ApiError::from(ShortUrlError::NotFound(code)))
-        }
-        Some(short) => {
-            state
-                .short_url_service
-                .get_by_uuid_for_user(short.uuid, user_uuid, is_admin)
-                .await?;
-            tracing::debug!(%short, "ok");
-            Ok(Json(short))
-        }
-    }
-}
-
-#[utoipa::path(
     post,
     path = "/shorten",
     tag = "short-url",
@@ -193,8 +126,47 @@ pub async fn create_vanity_url(
 }
 
 #[utoipa::path(
+    get,
+    path = "/shorten/uuid/{uuid}",
+    tag = "short-url",
+    security(("bearerAuth" = [])),
+    params(
+        ("uuid" = Uuid, Path, description = "Short URL UUID")
+    ),
+    responses(
+        (status = 200, description = "Short URL found", body = ShortUrl),
+        (status = 401, description = "Bearer token is missing or invalid", body = ApiError),
+        (status = 403, description = "Resource access is forbidden", body = ApiError),
+        (status = 404, description = "Short URL was not found", body = ApiError),
+        (status = 500, description = "Unexpected data access error", body = ApiError)
+    )
+)]
+#[instrument(skip(state, access_claims))]
+pub async fn get_one_by_uuid(
+    access_claims: AccessClaims,
+    State(state): State<SharedState>,
+    Path(uuid): Path<Uuid>,
+) -> Result<Json<ShortUrl>, ApiError> {
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
+    let is_admin = access_claims.validate_role_admin().is_ok();
+
+    tracing::debug!(%uuid, "get one by uuid");
+    if let Some(short) = state
+        .short_url_service
+        .get_by_uuid_for_user(uuid, user_uuid, is_admin)
+        .await?
+    {
+        tracing::debug!(?short, "ok");
+        Ok(Json(short))
+    } else {
+        tracing::warn!(%uuid, "not found");
+        Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
+    }
+}
+
+#[utoipa::path(
     patch,
-    path = "/shorten/{uuid}",
+    path = "/shorten/uuid/{uuid}",
     tag = "short-url",
     security(("bearerAuth" = [])),
     params(
@@ -238,7 +210,7 @@ pub async fn update_one_by_uuid(
 
 #[utoipa::path(
     delete,
-    path = "/shorten/{uuid}",
+    path = "/shorten/uuid/{uuid}",
     tag = "short-url",
     security(("bearerAuth" = [])),
     params(
@@ -271,5 +243,33 @@ pub async fn delete_one_by_uuid(
     } else {
         tracing::warn!(%uuid, "not found");
         Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
+    }
+}
+
+// Note: this handler is not currently registered in any route. Auth is added here for
+// consistency so it is ready when the route is wired up.
+#[instrument(skip(state, access_claims))]
+pub async fn get_one_by_code(
+    access_claims: AccessClaims,
+    State(state): State<SharedState>,
+    Path(code): Path<String>,
+) -> Result<Json<ShortUrl>, ApiError> {
+    let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
+    let is_admin = access_claims.validate_role_admin().is_ok();
+
+    tracing::debug!(%code, "get one by code");
+    match state.short_url_service.get_by_code(&code).await? {
+        None => {
+            tracing::warn!(%code, "not found");
+            Err(ApiError::from(ShortUrlError::NotFound(code)))
+        }
+        Some(short) => {
+            state
+                .short_url_service
+                .get_by_uuid_for_user(short.uuid, user_uuid, is_admin)
+                .await?;
+            tracing::debug!(%short, "ok");
+            Ok(Json(short))
+        }
     }
 }

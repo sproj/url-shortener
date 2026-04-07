@@ -3,7 +3,7 @@ use serde_json::json;
 use url_shortener::api::handlers::short_url::CreateShortUrlResponse;
 
 use crate::common::{
-    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_VANITY},
+    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_SHORTEN_BY_UUID, API_PATH_VANITY},
     helpers::create_user_and_login,
     test_app::TestApp,
 };
@@ -55,7 +55,7 @@ async fn update_requires_auth() {
         create_owned_vanity_url(&client, &sut, &token, "upd-auth-test", "http://example.com").await;
 
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .json(&json!({ "long_url": "http://example.org" }))
         .send()
         .await
@@ -83,7 +83,7 @@ async fn update_forbidden_for_non_owner() {
     // User B attempts to update it
     let token_b = create_user_and_login(&client, &sut, "upd_owner_b").await;
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token_b)
         .json(&json!({ "long_url": "http://evil.example.com" }))
         .send()
@@ -114,7 +114,9 @@ async fn update_forbidden_for_unowned_url() {
     // A logged-in user should still be forbidden from updating it — nobody owns it
     let token = create_user_and_login(&client, &sut, "upd_unowned").await;
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, anonymous_url.uuid).as_str()))
+        .patch(
+            sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, anonymous_url.uuid).as_str()),
+        )
         .bearer_auth(&token)
         .json(&json!({ "long_url": "http://example.com/hijacked" }))
         .send()
@@ -154,7 +156,7 @@ async fn update_long_url_succeeds() {
 
     // Update the long_url, leaving the code unchanged
     let update_res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "long_url": updated_url }))
         .send()
@@ -194,7 +196,7 @@ async fn update_code_succeeds() {
 
     // Update the vanity code
     let update_res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "code": new_code }))
         .send()
@@ -259,7 +261,7 @@ async fn update_expires_at_succeeds() {
 
     // Set a future expiry
     let update_res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "expires_at": future_expiry }))
         .send()
@@ -321,7 +323,7 @@ async fn clear_expires_at_makes_redirect_permanent() {
 
     // Send expires_at: null to explicitly clear the expiry
     let update_res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "expires_at": null }))
         .send()
@@ -365,7 +367,7 @@ async fn update_with_empty_body_rejected() {
     .await;
 
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({}))
         .send()
@@ -396,7 +398,7 @@ async fn update_with_invalid_long_url_rejected() {
     .await;
 
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "long_url": "not-a-url" }))
         .send()
@@ -427,7 +429,7 @@ async fn update_with_invalid_code_rejected() {
     .await;
 
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "code": "invalid code!" }))
         .send()
@@ -459,7 +461,7 @@ async fn update_with_past_expiry_rejected() {
     let yesterday = chrono::Utc::now() - chrono::Duration::days(1);
 
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, created.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "expires_at": yesterday }))
         .send()
@@ -502,7 +504,7 @@ async fn update_code_conflict_rejected() {
 
     // Attempt to change the second URL's code to one that is already taken
     let res = client
-        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, second.uuid).as_str()))
+        .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, second.uuid).as_str()))
         .bearer_auth(&token)
         .json(&json!({ "code": "upd-conflict-taken" }))
         .send()

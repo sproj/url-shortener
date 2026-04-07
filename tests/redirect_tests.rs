@@ -6,7 +6,7 @@ use url_shortener::api::handlers::short_url::CreateShortUrlResponse;
 use uuid::Uuid;
 
 use crate::common::{
-    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN},
+    constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_SHORTEN_BY_UUID},
     helpers::login_as_admin,
     test_app, test_redis,
 };
@@ -149,7 +149,7 @@ async fn deleted_code_returns_410() {
 
     let token = login_as_admin(&client, &sut).await;
     let delete = client
-        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, short.uuid).as_str()))
+        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, short.uuid).as_str()))
         .bearer_auth(&token)
         .send()
         .await
@@ -228,7 +228,7 @@ async fn deleting_short_url_invalidates_cached_redirect() {
     assert!(cached_before.is_some());
 
     let delete = client
-        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN, short.uuid).as_str()))
+        .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, short.uuid).as_str()))
         .bearer_auth(token)
         .send()
         .await
