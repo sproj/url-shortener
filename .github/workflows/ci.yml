@@ -30,11 +30,23 @@ env:
   JWT_ENABLE_REVOKED_TOKENS: true
 
 jobs:
-  lint:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-cache
+      - name: build
+        run: cargo build --release
+  lint:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-cache
       - name: check
         run: cargo check
       - name: clippy
@@ -44,9 +56,12 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-cache
       - name: unit test
         run: cargo test --lib
   integration-test:
@@ -55,13 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-cache
       - name: integration test
         run: cargo run test --tests
-  build:
-    runs-on: ubuntu-latest
-    needs: integration-test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2.9.1
-      - name: build
-        run: cargo build --release
