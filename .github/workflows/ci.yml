@@ -57,7 +57,7 @@ jobs:
         run: cargo test --lib
   integration-test:
     runs-on: ubuntu-latest
-    needs: [lint, unit-test]
+    needs: lint
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.9.1
