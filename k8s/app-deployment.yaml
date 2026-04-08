@@ -20,8 +20,8 @@ spec:
     spec:
       containers:
         - name: url-shortener
-          image: url-shortener:latest
-          imagePullPolicy: Never
+          image: ghcr.io/sproj/url-shortener:main
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           envFrom:
