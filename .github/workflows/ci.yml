@@ -1,0 +1,35 @@
+name: Rust
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  # api
+  SERVICE_HOST: 127.0.0.1
+  SERVICE_PORT: 8080
+  MAX_RETRIES: 5
+  #jwt
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  JWT_EXPIRE_ACCESS_TOKEN_SECONDS: 30
+  JWT_EXPIRE_REFRESH_TOKEN_SECONDS: 60
+  JWT_VALIDATION_LEEWAY_SECONDS: 5
+  JWT_ENABLE_REVOKED_TOKENS: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.9.1
+      - name: check
+        run: cargo check
+      - name: clippy
+        run: cargo clippy -- -D warnings
+      - name: fmt
+        run: cargo fmt --check
+      - name: Run unit tests
+        run: cargo test --lib
