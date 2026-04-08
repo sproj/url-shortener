@@ -1,0 +1,67 @@
+name: Rust
+
+on:
+  pull_request:
+    branches:
+      - "main"
+
+env:
+  CARGO_TERM_COLOR: always
+  ENV_TEST: 1
+  TESTCONTAINERS_RYUK_DISABLED: true
+  # api
+  SERVICE_HOST: 127.0.0.1
+  SERVICE_PORT: 8080
+  MAX_RETRIES: 5
+  # pgres
+  POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+  POSTGRES_HOST: 127.0.0.1
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: url_shortener
+  POSTGRES_CONNECTION_POOL: 5
+  # redis
+  REDIS_HOST: 127.0.0.1
+  REDIS_PORT: 6379
+  #jwt
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  JWT_EXPIRE_ACCESS_TOKEN_SECONDS: 30
+  JWT_EXPIRE_REFRESH_TOKEN_SECONDS: 60
+  JWT_VALIDATION_LEEWAY_SECONDS: 5
+  JWT_ENABLE_REVOKED_TOKENS: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-lint
+      - name: check
+        run: cargo check
+      - name: clippy
+        run: cargo clippy -- -D warnings
+      - name: fmt
+        run: cargo fmt --check
+
+  unit-test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-unit-test
+      - name: unit test
+        run: cargo test --lib
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          shared-key: cargo-integration-test
+      - name: integration test
+        run: cargo test --tests

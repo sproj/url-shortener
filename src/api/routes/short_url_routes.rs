@@ -4,7 +4,7 @@ use axum::{
 };
 
 use crate::{
-    api::handlers::short_url::{
+    api::handlers::short_url::short_url_handlers::{
         create_short_url, create_vanity_url, delete_one_by_uuid, get_all, get_one_by_code,
         get_one_by_uuid, update_one_by_uuid,
     },
