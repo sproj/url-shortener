@@ -8,6 +8,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   ENV_TEST: 1
+  TESTCONTAINERS_RYUK_DISABLED: true
   # api
   SERVICE_HOST: 127.0.0.1
   SERVICE_PORT: 8080
@@ -73,4 +74,4 @@ jobs:
         with:
           shared-key: cargo-cache
       - name: integration test
-        run: cargo run test --tests
+        run: cargo test --tests
