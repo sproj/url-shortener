@@ -10,6 +10,7 @@ pub type SharedTestDb = SharedContainer<Postgres, DbConfig>;
 static CONTAINER: Mutex<Weak<SharedTestDb>> = Mutex::new(Weak::new());
 
 pub async fn get_or_create() -> Arc<SharedContainer<Postgres, DbConfig>> {
+    tracing::debug!("getting or creating test db container");
     get_or_create_shared_container(&CONTAINER, async move || {
         let container = Postgres::default()
             .with_db_name("test_postgres")
