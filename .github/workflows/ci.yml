@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  ENV_TEST: 1
   # api
   SERVICE_HOST: 127.0.0.1
   SERVICE_PORT: 8080
