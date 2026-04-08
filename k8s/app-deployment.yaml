@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: url-shortener
-          image: url-shortener:0.1.0
+          image: url-shortener:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
@@ -43,6 +43,11 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: dbname
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: secret
           livenessProbe:
             httpGet:
               path: /health

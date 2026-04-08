@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum StartupError {
-    #[error("config error")]
+    #[error("config error: {0}")]
     Config(String),
     #[error("failed to create db connection pool")]
     DbPoolCreation(#[from] deadpool_postgres::CreatePoolError),

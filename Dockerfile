@@ -2,7 +2,8 @@ FROM rust:1.90 AS builder
 
 WORKDIR /app
 
-COPY . .
+COPY Cargo.toml Cargo.lock refinery.toml ./
+COPY src ./src
 
 RUN cargo build --release
 
