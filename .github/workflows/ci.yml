@@ -31,7 +31,7 @@ env:
   JWT_ENABLE_REVOKED_TOKENS: true
 
 jobs:
-  build:
+  build-debug:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,10 +39,10 @@ jobs:
         with:
           shared-key: cargo-cache
       - name: build
-        run: cargo build --release
+        run: cargo build
   lint:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-debug
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.9.1
@@ -57,7 +57,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-debug
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.9.1
