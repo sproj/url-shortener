@@ -60,6 +60,7 @@ impl Modify for SecurityAddon {
         crate::api::handlers::short_url::handlers::create_vanity_url,
         crate::api::handlers::short_url::handlers::update_one_by_uuid,
         crate::api::handlers::short_url::handlers::delete_one_by_uuid,
+        crate::api::handlers::short_url::handlers::get_one_by_code,
         user_handlers::get_all,
         user_handlers::get_one_by_uuid,
         user_handlers::delete_one_by_uuid,
