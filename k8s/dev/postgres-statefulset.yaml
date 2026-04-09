@@ -56,21 +56,17 @@ spec:
           livenessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - admin
-                - -d
-                - url_shortener
+                - sh
+                - c
+                - pg_isready -U $PG_USER -d $POSTGRES_DB
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - admin
-                - -d
-                - url_shortener
+                - sh
+                - c
+                - pg_isready -U $PG_USER -d $POSTGRES_DB
             initialDelaySeconds: 5
             periodSeconds: 5
   volumeClaimTemplates:
@@ -78,7 +74,7 @@ spec:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: standard
+        storageClassName: ebs-sc
         resources:
           requests:
             storage: 1Gi
