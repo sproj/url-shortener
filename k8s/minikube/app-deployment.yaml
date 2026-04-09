@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: url-shortener
-          image: ghcr.io/sproj/url-shortener:a8235893d0ba3783f61897e0da543f7f8aab4b73ea33e3479dc949e5e17319f0
+          image: ghcr.io/sproj/url-shortener:sha-a8235893d0ba3783f61897e0da543f7f8aab4b73ea33e3479dc949e5e17319f0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -60,3 +60,10 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"

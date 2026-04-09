@@ -29,3 +29,10 @@ spec:
             - containerPort: 4318
               name: otlp-http
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
