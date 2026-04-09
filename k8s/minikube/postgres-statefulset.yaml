@@ -56,21 +56,17 @@ spec:
           livenessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - admin
-                - -d
-                - url_shortener
+                - sh
+                - c
+                - pg_isready -U $PG_USER -d $POSTGRES_DB
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - admin
-                - -d
-                - url_shortener
+                - sh
+                - c
+                - pg_isready -U $PG_USER -d $POSTGRES_DB
             initialDelaySeconds: 5
             periodSeconds: 5
   volumeClaimTemplates:
