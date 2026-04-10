@@ -34,23 +34,23 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-credentials
-                  key: username
+                  name: url-shortener-secrets
+                  key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-credentials
-                  key: password
+                  name: url-shortener-secrets
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: postgres-credentials
-                  key: dbname
+                  name: url-shortener-secrets
+                  key: POSTGRES_DB
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: jwt-secret
-                  key: secret
+                  name: url-shortener-secrets
+                  key: JWT_SECRET
           livenessProbe:
             httpGet:
               path: /health
