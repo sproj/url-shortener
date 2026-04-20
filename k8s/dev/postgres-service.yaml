@@ -1,19 +1,3 @@
-# Headless service — required by StatefulSet for pod DNS
-# Gives each pod a stable DNS name: postgres-0.postgres-headless.url-shortener.svc.cluster.local
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres-headless
-  namespace: url-shortener
-spec:
-  clusterIP: None
-  selector:
-    app: url-shortener
-    component: postgres
-  ports:
-    - port: 5432
-      name: postgres
----
 # ClusterIP service — used by the app to reach postgres
 # App connects to: postgres-service:5432
 apiVersion: v1
