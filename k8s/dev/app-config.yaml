@@ -16,6 +16,6 @@ data:
   JWT_EXPIRE_REFRESH_TOKEN_SECONDS: "6000"
   JWT_VALIDATION_LEEWAY_SECONDS: "60"
   JWT_ENABLE_REVOKED_TOKENS: "false"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger.observability.svc.cluster.local:4317"
   # log level
   RUST_LOG: "info,opentelemetry_sdk=off"
