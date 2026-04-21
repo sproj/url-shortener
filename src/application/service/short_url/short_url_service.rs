@@ -1,6 +1,7 @@
 use std::{ops::Sub, sync::Arc};
 
 use chrono::{TimeDelta, Utc};
+use metrics::{counter, gauge};
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 use uuid::Uuid;
@@ -139,7 +140,11 @@ impl ShortUrlServiceTrait for ShortUrlService {
 
         tracing::info!(%deleted_code, "removing code from cache");
         match self.redirect_cache.delete(&deleted_code).await {
-            Ok(()) => Ok(delete_result),
+            Ok(()) => {
+                counter!("short_urls_deleted_total").increment(1);
+                gauge!("redirect_cache_size").decrement(1);
+                Ok(delete_result)
+            }
             Err(e) => {
                 tracing::error!(%e, %deleted_code, "Failed to invalidate cache after deleting record");
                 Ok(delete_result)
@@ -182,6 +187,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
 
             match self.short_url_repository.add_one(spec).await {
                 Ok(created) => {
+                    counter!("short_urls_created_total", "kind" => "random").increment(1);
                     return Ok(created);
                 }
                 Err(RepositoryError::Conflict {
@@ -247,7 +253,10 @@ impl ShortUrlServiceTrait for ShortUrlService {
         tracing::debug!(%spec);
 
         match self.short_url_repository.add_one(spec).await {
-            Ok(created) => Ok(created),
+            Ok(created) => {
+                counter!("short_urls_created_total", "kind" => "vanity").increment(1);
+                Ok(created)
+            }
             Err(RepositoryError::Conflict {
                 constraint,
                 message,
@@ -320,7 +329,10 @@ impl ShortUrlServiceTrait for ShortUrlService {
         };
 
         let update_result = match self.short_url_repository.update_one_by_uuid(spec).await {
-            Ok(created) => Ok(created),
+            Ok(updated) => {
+                counter!("vanity_urls_updated_total").increment(1);
+                Ok(updated)
+            }
             Err(RepositoryError::Conflict {
                 constraint,
                 message,
@@ -340,7 +352,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
             tracing::error!(%e, "cache deletion of updated url failed");
             e
         })?;
-
+        gauge!("redirect_cache_size").decrement(1);
         Ok(update_result)
     }
 
@@ -353,15 +365,27 @@ impl ShortUrlServiceTrait for ShortUrlService {
         tracing::debug!(?cache_result, "cache result");
         if let Ok(Some(cache_hit)) = cache_result {
             tracing::info!(%code, "cache hit");
+            counter!("redirect_cache_hits_total").increment(1);
             return Ok(cache_hit);
         }
 
         tracing::info!(%code, "cache miss - checking db");
+        counter!("redirect_cache_misses_total").increment(1);
+
         let record = self.short_url_repository.get_by_code(code).await?;
         match record {
-            None => Ok(RedirectDecision::NotFound),
-            Some(short) if short.is_deleted() => Ok(RedirectDecision::Gone),
-            Some(short) if short.is_expired() => Ok(RedirectDecision::Gone),
+            None => {
+                counter!("redirects_total", "result" => "not_found").increment(1);
+                Ok(RedirectDecision::NotFound)
+            }
+            Some(short) if short.is_deleted() => {
+                counter!("redirects_total", "result" => "gone").increment(1);
+                Ok(RedirectDecision::Gone)
+            }
+            Some(short) if short.is_expired() => {
+                counter!("redirects_total", "result" => "gone").increment(1);
+                Ok(RedirectDecision::Gone)
+            }
             Some(short) if short.expires_at.is_none() => {
                 let decision = RedirectDecision::Permanent {
                     long_url: short.long_url,
@@ -373,6 +397,10 @@ impl ShortUrlServiceTrait for ShortUrlService {
                 {
                     tracing::error!(%e, ?decision, "failed to write redirect decision to cache");
                 }
+
+                counter!("redirects_total", "result" => "permanent").increment(1);
+                gauge!("redirect_cache_size").increment(1);
+
                 // Cache set is best-effort: failure is logged but does not fail the operation
                 Ok(decision)
             }
@@ -397,6 +425,10 @@ impl ShortUrlServiceTrait for ShortUrlService {
                 {
                     tracing::error!(%e, ?decision, "failed to write redirect decision to cache");
                 }
+
+                counter!("redirects_total", "result" => "temporary").increment(1);
+                gauge!("redirect_cache_size").increment(1);
+
                 // Cache set is best-effort: failure is logged but does not fail the operation
                 Ok(decision)
             }
