@@ -1,5 +1,6 @@
 use chrono::Utc;
 use deadpool_postgres::Pool;
+use metrics::gauge;
 use tokio_postgres::types::{ToSql, Type};
 use tracing::instrument;
 use uuid::Uuid;
@@ -64,6 +65,8 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
     #[instrument(skip(self))]
     async fn get_all(&self) -> RepositoryResult<Vec<User>> {
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
 
         let rows = client
             .query(
@@ -81,10 +84,11 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
     #[instrument(skip(self))]
     async fn get_user_by_uuid(&self, uuid: Uuid) -> RepositoryResult<Option<User>> {
         tracing::debug!(%uuid, "get by uuid");
-        self.pool
-            .get()
-            .await
-            .map_err(DatabaseError::Pool)?
+        let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
+
+        client
             .query_opt(
                 format!(
                     "{}\n{}\n{}",
@@ -102,10 +106,11 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
     #[instrument(skip(self))]
     async fn get_user_by_username(&self, username: &str) -> RepositoryResult<Option<User>> {
         tracing::debug!(%username, "finding user by username");
-        self.pool
-            .get()
-            .await
-            .map_err(DatabaseError::Pool)?
+        let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
+
+        client
             .query_opt(
                 format!(
                     "{} {} {}",
@@ -124,7 +129,8 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
     async fn add_user(&self, spec: UserSpec) -> RepositoryResult<User> {
         tracing::debug!(%spec, "insert user spec");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
-
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
         let insert_user = client
             .prepare_typed(
                 INSERT_USER,
@@ -164,6 +170,8 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
     async fn soft_delete_user_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
         tracing::debug!(%uuid, "delete user by uuid");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
 
         let delete_statement = client
             .prepare(DELETE_USER_BY_UUID)
@@ -189,6 +197,8 @@ impl UsersRepositoryTrait for PostgresUsersRepository {
     ) -> RepositoryResult<bool> {
         tracing::debug!(%uuid, "update user by uuid");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
 
         let update_pass_statement = client
             .prepare(UPDATE_PASS_BY_USERID)

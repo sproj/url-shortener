@@ -8,6 +8,7 @@ use crate::{
 };
 use chrono::Utc;
 use deadpool_postgres::{GenericClient, Pool};
+use metrics::gauge;
 use tokio_postgres::types::{ToSql, Type};
 use tracing::instrument;
 use uuid::Uuid;
@@ -48,6 +49,8 @@ impl PostgresShortUrlRepository {
 impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
     #[instrument(skip(self))]
     async fn get_all(&self) -> RepositoryResult<Vec<ShortUrl>> {
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
 
         let rows = client
@@ -66,6 +69,8 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
     #[instrument(skip(self))]
     async fn get_by_uuid(&self, uuid: Uuid) -> RepositoryResult<Option<ShortUrl>> {
         tracing::debug!(%uuid, "get by uuid");
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
         self.pool
             .get()
             .await
@@ -88,10 +93,13 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
     #[instrument(skip(self))]
     async fn get_by_code(&self, code: &str) -> RepositoryResult<Option<ShortUrl>> {
         tracing::debug!(%code, "get by code");
-        self.pool
-            .get()
-            .await
-            .map_err(DatabaseError::Pool)?
+
+        let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
+
+        client
             .query_opt(
                 format!("{} WHERE code = $1", SELECT_SHORT_URL_ROW).as_str(),
                 &[&code],
@@ -108,6 +116,8 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
         tracing::debug!(%spec, "insert short_url spec");
 
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
 
         let insert_long_url = client
         .prepare_typed(
@@ -137,7 +147,10 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
     #[instrument(skip(self))]
     async fn update_one_by_uuid(&self, spec: ShortUrlSpec) -> RepositoryResult<ShortUrl> {
         tracing::debug!(%spec, "update short_url spec");
+
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
 
         let update_statement = client
             .prepare(UPDATE_SHORT_URL_ROW)
@@ -159,6 +172,8 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
     async fn delete_one_by_uuid(&self, uuid: Uuid) -> RepositoryResult<bool> {
         tracing::debug!(%uuid, "delete short_url by uuid");
         let client = self.pool.get().await.map_err(DatabaseError::Pool)?;
+        let pool_status = self.pool.status();
+        gauge!("db_connections_in_use").set(pool_status.size as f64 - pool_status.available as f64);
 
         let delete_statement = client
             .prepare("UPDATE short_url SET deleted_at = $1 WHERE uuid = $2")
