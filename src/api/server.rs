@@ -13,11 +13,15 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use axum_prometheus::PrometheusMetricLayer;
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
 use tower_http::normalize_path::NormalizePathLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+
+use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
+use std::sync::OnceLock;
 
 pub async fn start(config: Config, state: SharedState) -> Result<(), StartupError> {
     let listener = listen(config).await?;
@@ -35,6 +39,9 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
 pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
     let openapi = ApiDoc::openapi();
 
+    let prometheus_layer = PrometheusMetricLayer::default();
+    let metric_handle = get_or_init_metrics_handle();
+
     let router = Router::new()
         .route("/login", post(login))
         .route("/logout", post(logout))
@@ -44,15 +51,28 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .nest("/shorten", short_url_routes::routes())
         .nest("/users", users_routes::routes())
         .nest("/r", redirect_routes::routes())
+        .route("/metrics", get(async move || metric_handle.render()))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .fallback(error_404_handler)
         .layer(NormalizePathLayer::trim_trailing_slash())
+        .layer(prometheus_layer)
         .with_state(state);
 
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(|e| StartupError::Server(e.to_string()))
+}
+
+static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
+
+fn get_or_init_metrics_handle() -> PrometheusHandle {
+    METRICS_HANDLE
+        .get_or_init(|| {
+            let (_, handle) = PrometheusMetricLayer::pair();
+            handle
+        })
+        .clone()
 }
 
 #[utoipa::path(
