@@ -1,0 +1,112 @@
+# ConfigMap — holds the k6 script so the Job can mount it without baking it
+# into a custom image. To update the script: kubectl apply this file again,
+# then delete and re-run the Job.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-script
+  namespace: url-shortener
+  labels:
+    app: k6-load-test
+data:
+  script.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+    import { Rate, Trend } from 'k6/metrics';
+
+    const shortenErrorRate  = new Rate('shorten_errors');
+    const redirectErrorRate = new Rate('redirect_errors');
+    const shortenDuration   = new Trend('shorten_duration_ms', true);
+    const redirectDuration  = new Trend('redirect_duration_ms', true);
+
+    const BASE_URL = __ENV.BASE_URL || 'http://url-shortener-service.url-shortener.svc.cluster.local:8080';
+
+    const TARGET_URLS = [
+      'https://example.com/page/one',
+      'https://example.com/page/two',
+      'https://example.com/page/three',
+      'https://docs.example.com/getting-started',
+      'https://blog.example.com/post/load-testing-with-k6',
+    ];
+
+    export const options = {
+      stages: [
+        { duration: '30s', target: 5  },
+        { duration: '2m',  target: 5  },
+        { duration: '30s', target: 0  },
+      ],
+      thresholds: {
+        'shorten_duration_ms':  ['p(95)<500'],
+        'redirect_duration_ms': ['p(95)<200'],
+        'shorten_errors':       ['rate<0.01'],
+        'redirect_errors':      ['rate<0.01'],
+        'http_req_failed':      ['rate<0.01'],
+      },
+    };
+
+    export function setup() {
+      console.log(`Target: ${BASE_URL}`);
+      console.log('Verifying application health before starting load...');
+      const res = http.get(`${BASE_URL}/health`);
+      if (res.status !== 200) {
+        throw new Error(`Health check failed: status=${res.status} — aborting test`);
+      }
+      console.log('Health check passed. Starting load test.');
+    }
+
+    export default function () {
+      const targetUrl = TARGET_URLS[Math.floor(Math.random() * TARGET_URLS.length)];
+
+      const shortenRes = http.post(
+        `${BASE_URL}/shorten`,
+        JSON.stringify({ long_url: targetUrl }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          tags: { endpoint: 'shorten' },
+        }
+      );
+
+      shortenDuration.add(shortenRes.timings.duration, { endpoint: 'shorten' });
+
+      const shortenOk = check(shortenRes, {
+        'shorten: status 201':       (r) => r.status === 201,
+        'shorten: has code in body': (r) => {
+          try { return JSON.parse(r.body).code !== undefined; }
+          catch { return false; }
+        },
+      });
+
+      shortenErrorRate.add(!shortenOk);
+
+      if (!shortenOk) {
+        console.warn(`Shorten failed: status=${shortenRes.status} body=${shortenRes.body}`);
+        sleep(1);
+        return;
+      }
+
+      const code = JSON.parse(shortenRes.body).code;
+      sleep(0.5);
+
+      const redirectRes = http.get(
+        `${BASE_URL}/r/${code}`,
+        {
+          redirects: 0,
+          tags: { endpoint: 'redirect' },
+        }
+      );
+
+      redirectDuration.add(redirectRes.timings.duration, { endpoint: 'redirect' });
+
+      const redirectOk = check(redirectRes, {
+        'redirect: status 301 or 302':    (r) => r.status === 301 || r.status === 302,
+        'redirect: Location header present': (r) => r.headers['Location'] !== undefined,
+      });
+
+      redirectErrorRate.add(!redirectOk);
+
+      if (!redirectOk) {
+        console.warn(`Redirect failed: status=${redirectRes.status} code=${code}`);
+      }
+
+      sleep(1);
+    }

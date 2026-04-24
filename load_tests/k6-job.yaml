@@ -1,0 +1,78 @@
+# Job — runs k6 once and exits. Re-run by deleting and re-applying.
+# Uses the official Grafana k6 image — no custom image needed.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-baseline
+  namespace: url-shortener
+  labels:
+    app: k6-load-test
+    test: baseline
+spec:
+  # Don't retry on failure — a failed load test run should be investigated,
+  # not silently retried, as retries pollute your baseline metrics.
+  backoffLimit: 0
+
+  # Clean up the completed Job pod after 10 minutes so it doesn't clutter
+  # your namespace. Remove this if you want to inspect logs after the fact.
+  ttlSecondsAfterFinished: 600
+
+  template:
+    metadata:
+      labels:
+        app: k6-load-test
+        test: baseline
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: k6
+          image: grafana/k6:0.57.0
+          imagePullPolicy: IfNotPresent
+
+          # The k6 command:
+          #   --out prometheus-rw  pushes metrics to Prometheus remote write
+          #   /scripts/script.js   the test script from the ConfigMap
+          command:
+            - k6
+            - run
+            - --out
+            - experimental-prometheus-rw
+            - /scripts/script.js
+
+          env:
+            # Where to push metrics — in-cluster Prometheus remote write endpoint.
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: "http://kube-prometheus-stack-prometheus.observability.svc.cluster.local\
+                :9090/api/v1/write"
+
+            # Add a k6_test_run label to every metric so you can filter by run in Grafana.
+            # Change this value between runs to distinguish baseline from later tests.
+            - name: K6_PROMETHEUS_RW_TREND_STATS
+              value: "p(50),p(90),p(95),p(99),min,max"
+
+            # Stale marker support — tells Prometheus to expire k6 metrics cleanly
+            # when the job finishes rather than leaving them as flat lines.
+            - name: K6_PROMETHEUS_RW_STALE_MARKERS
+              value: "true"
+
+            # The app URL — override this env var to switch to external testing.
+            - name: BASE_URL
+              value: "http://url-shortener-service.url-shortener.svc.cluster.local:8080"
+
+          volumeMounts:
+            - name: k6-script
+              mountPath: /scripts
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+      volumes:
+        - name: k6-script
+          configMap:
+            name: k6-script
