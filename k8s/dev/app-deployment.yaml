@@ -20,29 +20,29 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-credentials
-      # initContainers:
-      #   - name: create-database
-      #     image: postgres:17-alpine
-      #     env:
-      #       - name: POSTGRES_USER
-      #         valueFrom:
-      #           secretKeyRef:
-      #             name: url-shortener-secrets
-      #             key: POSTGRES_USER
-      #       - name: POSTGRES_PASSWORD
-      #         valueFrom:
-      #           secretKeyRef:
-      #             name: url-shortener-secrets
-      #             key: POSTGRES_PASSWORD
-      #     command:
-      #       - sh
-      #       - -c
-      #       - |
-      #         psql "postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres-service.databases.svc.cluster.local:5432/postgres" \
-      #           -c "SELECT 'CREATE DATABASE url_shortener' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'url_shortener')\gexec" 
+      initContainers:
+        - name: create-database
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: url-shortener-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: url-shortener-secrets
+                  key: POSTGRES_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              psql "postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres-service.databases.svc.cluster.local:5432/postgres" \
+                -c "SELECT 'CREATE DATABASE url_shortener' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'url_shortener')\gexec" 
       containers:
         - name: url-shortener
-          image: ghcr.io/sproj/url-shortener@sha256:6276dca8618ede69449f082b35b42874f19fb64bed43ef48dd43d69c083fb06d
+          image: ghcr.io/sproj/url-shortener:main
           imagePullPolicy: IfNotPresent
 
           ports:
