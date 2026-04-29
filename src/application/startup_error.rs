@@ -14,6 +14,8 @@ pub enum StartupError {
     Server(String),
     #[error("redis startup error")]
     RedisConnection(String),
+    #[error("rabbitmq startup error: {0}")]
+    RabbitMqConnection(String),
     #[error("tracing subscriber init error: {0}")]
     TracingSubscriber(String),
 }
