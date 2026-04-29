@@ -53,8 +53,7 @@ impl RabbitMqConfig {
     pub fn amqp_url(&self) -> String {
         format!(
             "amqp://{}:{}@{}:{}/",
-            self.rabbitmq_user, self.rabbitmq_password,
-            self.rabbitmq_host, self.rabbitmq_port
+            self.rabbitmq_user, self.rabbitmq_password, self.rabbitmq_host, self.rabbitmq_port
         )
     }
 }
@@ -140,7 +139,10 @@ pub fn load() -> Result<Config, StartupError> {
                 rabbitmq_user: env_get_or("RABBITMQ_USER", "guest"),
                 rabbitmq_password: env_get_or("RABBITMQ_PASSWORD", "guest"),
                 rabbitmq_exchange: env_get_or("RABBITMQ_EXCHANGE", ""),
-                redirect_event_routing_key: env_get_or("REDIRECT_EVENT_ROUTING_KEY", "redirect_events"),
+                redirect_event_routing_key: env_get_or(
+                    "REDIRECT_EVENT_ROUTING_KEY",
+                    "redirect_events",
+                ),
             }),
             Err(_) => None,
         },
