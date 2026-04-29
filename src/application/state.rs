@@ -4,6 +4,7 @@ use deadpool_postgres::Pool;
 use jsonwebtoken::DecodingKey;
 
 use crate::application::service::{
+    analytics::analytics_publisher_trait::AnalyticsPublisherTrait,
     auth::auth_service_trait::AuthServiceTrait,
     short_url::short_url_service_trait::ShortUrlServiceTrait,
     user::user_service_trait::UserServiceTrait,
@@ -17,4 +18,5 @@ pub struct AppState {
     pub user_service: Arc<dyn UserServiceTrait>,
     pub short_url_service: Arc<dyn ShortUrlServiceTrait>,
     pub auth_service: Arc<dyn AuthServiceTrait>,
+    pub analytics_publisher: Arc<dyn AnalyticsPublisherTrait>,
 }

@@ -186,6 +186,7 @@ mod tests {
                 jwt_secret: "test_secret".to_string(),
                 jwt_validation_leeway_seconds: 10,
             },
+            rabbitmq: None,
         };
 
         let result = listen(config).await;

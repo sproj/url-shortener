@@ -7,7 +7,9 @@ use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use url_shortener::application::{app::App, config, startup_error::StartupError};
-use url_shortener::infrastructure::{database::postgres::Database, redis::connect};
+use url_shortener::infrastructure::{
+    database::postgres::Database, messaging::connect as rabbitmq_connect, redis::connect,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), StartupError> {
@@ -53,12 +55,13 @@ async fn run() -> Result<(), StartupError> {
     Database::migrate(&db_pool).await?;
 
     let redis = connect::connect(&cfg.redis).await?;
-    App::builder(cfg, db_pool)
-        .with_redis(redis)
-        .build()
-        .await?
-        .start()
-        .await
+
+    let mut builder = App::builder(cfg.clone(), db_pool).with_redis(redis);
+    if let Some(ref rmq_cfg) = cfg.rabbitmq {
+        let channel = rabbitmq_connect::connect(rmq_cfg).await?;
+        builder = builder.with_rabbitmq(channel);
+    }
+    builder.build().await?.start().await
 }
 
 fn init_tracer() -> sdktrace::SdkTracerProvider {

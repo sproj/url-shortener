@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use crate::application::repository::short_url_repository::PostgresShortUrlRepository;
 use crate::application::repository::users_repository::PostgresUsersRepository;
+use crate::application::service::analytics::analytics_publisher_trait::{
+    AnalyticsPublisherTrait, NoopAnalyticsPublisher,
+};
 use crate::application::service::auth::auth_service::AuthService;
 use crate::application::service::auth::refresh_token_cache::RefreshTokenCache;
 use crate::application::service::auth::refresh_token_cache_trait::{
@@ -16,9 +19,11 @@ use crate::application::service::short_url::short_url_service::ShortUrlService;
 use crate::application::service::user::user_service::UsersService;
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppState, SharedState};
+use crate::infrastructure::messaging::rabbitmq::RabbitMqPublisher;
 use crate::{api::server, application::config::Config};
 
 use deadpool_postgres::Pool;
+use lapin::Channel;
 use redis::aio::MultiplexedConnection;
 
 pub struct App {
@@ -54,6 +59,7 @@ pub struct AppBuilder {
     db_pool: Pool,
     redis: Option<MultiplexedConnection>,
     code_generator: Option<Arc<dyn CodeGenerator>>,
+    rabbitmq: Option<Channel>,
 }
 
 impl AppBuilder {
@@ -63,8 +69,10 @@ impl AppBuilder {
             db_pool,
             redis: None,
             code_generator: None,
+            rabbitmq: None,
         }
     }
+
     pub fn with_config(mut self, config: Config) -> Self {
         self.config = config;
         self
@@ -85,6 +93,11 @@ impl AppBuilder {
         self
     }
 
+    pub fn with_rabbitmq(mut self, channel: Channel) -> Self {
+        self.rabbitmq = Some(channel);
+        self
+    }
+
     pub async fn build(self) -> Result<App, StartupError> {
         let code_generator: Arc<dyn CodeGenerator> = self
             .code_generator
@@ -97,6 +110,24 @@ impl AppBuilder {
             Some(conn) => Arc::new(RefreshTokenCache::new(conn.clone())),
             None => Arc::new(NoopRefreshTokenCache),
         };
+        let analytics_publisher: Arc<dyn AnalyticsPublisherTrait> = match self.rabbitmq {
+            Some(channel) => {
+                let (exchange, routing_key) = self
+                    .config
+                    .rabbitmq
+                    .as_ref()
+                    .map(|rmq| {
+                        (
+                            rmq.rabbitmq_exchange.clone(),
+                            rmq.redirect_event_routing_key.clone(),
+                        )
+                    })
+                    .unwrap_or_else(|| (String::new(), "redirect_events".to_string()));
+                Arc::new(RabbitMqPublisher::new(channel, exchange, routing_key))
+            }
+            None => Arc::new(NoopAnalyticsPublisher),
+        };
+
         let short_url_repository = Arc::new(PostgresShortUrlRepository::new(self.db_pool.clone()));
         let users_repository = Arc::new(PostgresUsersRepository::new(self.db_pool.clone()));
 
@@ -122,6 +153,7 @@ impl AppBuilder {
                 cfg.jwt.jwt_keys.encoding.clone(),
             )),
             jwt_decoding_key: cfg.jwt.jwt_keys.decoding,
+            analytics_publisher,
         });
         Ok(App {
             config: self.config,
