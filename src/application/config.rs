@@ -12,6 +12,8 @@ pub struct Config {
     pub redis: RedisConfig,
     // JWT configuration
     pub jwt: JwtConfig,
+    // RabbitMQ configuration
+    pub rabbitmq: Option<RabbitMqConfig>,
 }
 
 #[derive(Clone, Debug)]
@@ -35,6 +37,26 @@ pub struct DbConfig {
 pub struct RedisConfig {
     pub redis_host: String,
     pub redis_port: u16,
+}
+
+#[derive(Clone, Debug)]
+pub struct RabbitMqConfig {
+    pub rabbitmq_host: String,
+    pub rabbitmq_port: u16,
+    pub rabbitmq_user: String,
+    pub rabbitmq_password: String,
+    pub rabbitmq_exchange: String,
+    pub redirect_event_routing_key: String,
+}
+
+impl RabbitMqConfig {
+    pub fn amqp_url(&self) -> String {
+        format!(
+            "amqp://{}:{}@{}:{}/",
+            self.rabbitmq_user, self.rabbitmq_password,
+            self.rabbitmq_host, self.rabbitmq_port
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -110,6 +132,17 @@ pub fn load() -> Result<Config, StartupError> {
             jwt_expire_refresh_token_seconds: env_parse("JWT_EXPIRE_REFRESH_TOKEN_SECONDS")?,
             jwt_validation_leeway_seconds: env_parse("JWT_VALIDATION_LEEWAY_SECONDS")?,
             jwt_enable_revoked_tokens: env_parse("JWT_ENABLE_REVOKED_TOKENS")?,
+        },
+        rabbitmq: match std::env::var("RABBITMQ_HOST") {
+            Ok(host) => Some(RabbitMqConfig {
+                rabbitmq_host: host,
+                rabbitmq_port: env_parse("RABBITMQ_PORT")?,
+                rabbitmq_user: env_get_or("RABBITMQ_USER", "guest"),
+                rabbitmq_password: env_get_or("RABBITMQ_PASSWORD", "guest"),
+                rabbitmq_exchange: env_get_or("RABBITMQ_EXCHANGE", ""),
+                redirect_event_routing_key: env_get_or("REDIRECT_EVENT_ROUTING_KEY", "redirect_events"),
+            }),
+            Err(_) => None,
         },
     };
 
@@ -221,6 +254,7 @@ mod tests {
                 jwt_validation_leeway_seconds: 30,
                 jwt_enable_revoked_tokens: false,
             },
+            rabbitmq: None,
         }
     }
 
