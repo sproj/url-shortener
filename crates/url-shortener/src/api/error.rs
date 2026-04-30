@@ -160,10 +160,7 @@ impl From<AuthError> for ApiError {
                     .kind(ApiErrorKind::Unauthorized)
                     .detail(json!({"reason": reason}))
             }
-            AuthError::CachingError(e) => {
-                tracing::error!(%e, "token cache layer error");
-                ApiError::new("cache layer error").kind(ApiErrorKind::Internal)
-            }
+            AuthError::Internal => ApiError::new("auth layer error").kind(ApiErrorKind::Internal),
         }
     }
 }
