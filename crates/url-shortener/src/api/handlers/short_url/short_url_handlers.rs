@@ -6,6 +6,7 @@ use axum::{
 use tracing::instrument;
 use uuid::Uuid;
 
+use crate::application::security::claims::AccessClaims;
 use crate::{
     api::{
         error::ApiError,
@@ -21,10 +22,7 @@ use crate::{
     },
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
 };
-use auth::{
-    auth_error::AuthError,
-    jwt::{AccessClaims, ClaimsMethods},
-};
+use auth::{auth_error::AuthError, jwt::ClaimsMethods};
 
 #[utoipa::path(
     get,

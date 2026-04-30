@@ -1,8 +1,6 @@
+use crate::application::security::claims::RefreshClaims;
 use crate::application::service::user::login_params::LoginParams;
-use auth::{
-    auth_error::AuthError,
-    jwt::{JwtTokens, RefreshClaims},
-};
+use auth::{auth_error::AuthError, jwt::JwtTokens};
 
 /// Trait that defines the auth service contract, independent of infrastructure.
 ///
