@@ -3,7 +3,8 @@ FROM rust:1.90 AS builder
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
-COPY src ./src
+COPY crates/url-shortener/src ./crates/url-shortener/src
+COPY crates/url-shortener/Cargo.toml ./crates/url-shortener/Cargo.toml
 
 RUN cargo build --release
 
