@@ -104,7 +104,10 @@ impl AuthServiceTrait for AuthService {
         self.refresh_token_cache
             .set(&refresh_claims.prf, refresh_claims, ttl)
             .await
-            .map_err(AuthError::CachingError)?;
+            .map_err(|e| {
+                tracing::error!(%e, "auth service cache operation failed");
+                AuthError::Internal
+            })?;
 
         Ok(())
     }
@@ -121,7 +124,10 @@ impl AuthServiceTrait for AuthService {
             .refresh_token_cache
             .get(&refresh_claims.prf)
             .await
-            .map_err(AuthError::CachingError)?
+            .map_err(|e| {
+                tracing::error!(%e, "get refresh token - auth service cache operation failed");
+                AuthError::Internal
+            })?
             .is_none()
         {
             tracing::warn!(%jti, "refresh attempted with revoked token");
@@ -149,7 +155,10 @@ impl AuthServiceTrait for AuthService {
                 self.refresh_token_cache
                     .revoke(&refresh_claims.prf)
                     .await
-                    .map_err(AuthError::CachingError)?;
+                    .map_err(|e| {
+                        tracing::error!(%e, "revoke refresh token - auth service cache operation failed");
+                        AuthError::Internal
+                    })?;
 
                 let claims = generate_claims(
                     self.jwt_access_token_seconds,
@@ -176,7 +185,10 @@ impl AuthServiceTrait for AuthService {
         self.refresh_token_cache
             .revoke(access_token_jti)
             .await
-            .map_err(AuthError::CachingError)
+            .map_err(|e| {
+                tracing::error!(%e, "revoke refresh - auth service cache operation failed");
+                AuthError::Internal
+            })
     }
 }
 
