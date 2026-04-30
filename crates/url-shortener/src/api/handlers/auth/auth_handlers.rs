@@ -3,6 +3,7 @@ use axum::{
     extract::{State, rejection::JsonRejection},
     response::IntoResponse,
 };
+use serde_json::json;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -15,7 +16,7 @@ use crate::{
     application::{
         security::{
             auth_error::AuthError,
-            jwt::{AccessClaims, JwtTokens, RefreshClaims, tokens_to_response},
+            jwt::{AccessClaims, JwtTokens, RefreshClaims},
         },
         service::user::login_params::LoginParams,
         state::SharedState,
@@ -47,7 +48,11 @@ pub async fn login(
 
     let tokens = state.auth_service.verify_login(login_params).await?;
 
-    let res = tokens_to_response(tokens);
+    let res = Json(json!({
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "token_type": "Bearer"
+    }));
 
     tracing::debug!(%parsed_login_request, "login successful, tokens issued");
     Ok(res)
