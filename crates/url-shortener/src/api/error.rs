@@ -9,7 +9,9 @@ use serde_json::json;
 use std::fmt::{Display, Formatter, Result};
 use utoipa::ToSchema;
 
-use crate::{application::security::auth_error::AuthError, domain::errors::UserError};
+use auth::auth_error::AuthError;
+
+use crate::domain::errors::UserError;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]

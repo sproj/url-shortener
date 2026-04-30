@@ -1,10 +1,8 @@
 use crate::{
-    application::{
-        security::auth::{generate_password_hash, generate_salt},
-        service::user::create_user_params::CreateUserParams,
-    },
+    application::service::user::create_user_params::CreateUserParams,
     domain::{errors::UserError, user_spec::UserSpec},
 };
+use auth::auth::{generate_password_hash, generate_salt};
 
 impl TryFrom<CreateUserParams> for UserSpec {
     type Error = UserError;

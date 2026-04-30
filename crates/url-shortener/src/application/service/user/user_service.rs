@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
+use auth::auth::{generate_password_hash, generate_salt};
 use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        security::auth::{generate_password_hash, generate_salt},
-        service::user::{
-            create_user_params::CreateUserParams, user_service_trait::UserServiceTrait,
-        },
+    application::service::user::{
+        create_user_params::CreateUserParams, user_service_trait::UserServiceTrait,
     },
     domain::{
         errors::UserError, models::user::User, traits::UsersRepositoryTrait, user_spec::UserSpec,

@@ -2,12 +2,10 @@ use redis::{AsyncTypedCommands, aio::MultiplexedConnection};
 use tracing::instrument;
 
 use crate::{
-    application::{
-        security::jwt::RefreshClaims,
-        service::auth::refresh_token_cache_trait::RefreshTokenCacheTrait,
-    },
+    application::service::auth::refresh_token_cache_trait::RefreshTokenCacheTrait,
     infrastructure::redis::cache_error::CacheError,
 };
+use auth::jwt::RefreshClaims;
 
 pub struct RefreshTokenCache {
     redis: MultiplexedConnection,
@@ -59,7 +57,7 @@ pub mod mocks {
         sync::{Mutex, MutexGuard},
     };
 
-    use crate::application::security::jwt::RefreshClaims;
+    use auth::jwt::RefreshClaims;
 
     use super::*;
 

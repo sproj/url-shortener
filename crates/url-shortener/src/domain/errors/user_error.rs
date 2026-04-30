@@ -1,9 +1,6 @@
+use crate::domain::{errors::RepositoryError, validation_issue::ValidationIssue};
+use auth::auth_error::AuthError;
 use thiserror::Error;
-
-use crate::{
-    application::security::auth_error::AuthError,
-    domain::{errors::RepositoryError, validation_issue::ValidationIssue},
-};
 
 #[derive(Debug, Error)]
 pub enum UserError {

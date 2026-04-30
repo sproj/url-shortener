@@ -1,11 +1,3 @@
-use axum::{
-    Json,
-    extract::{Path, State, rejection::JsonRejection},
-    http::StatusCode,
-};
-use tracing::instrument;
-use uuid::Uuid;
-
 use crate::{
     api::{
         error::ApiError,
@@ -14,13 +6,17 @@ use crate::{
             user_response::UserResponse,
         },
     },
-    application::{
-        security::jwt::{AccessClaims, ClaimsMethods},
-        service::user::create_user_params::CreateUserParams,
-        state::SharedState,
-    },
+    application::{service::user::create_user_params::CreateUserParams, state::SharedState},
     domain::errors::UserError,
 };
+use auth::jwt::{AccessClaims, ClaimsMethods};
+use axum::{
+    Json,
+    extract::{Path, State, rejection::JsonRejection},
+    http::StatusCode,
+};
+use tracing::instrument;
+use uuid::Uuid;
 
 #[utoipa::path(
     get,

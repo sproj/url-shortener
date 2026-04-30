@@ -3,10 +3,10 @@ use thiserror::Error;
 
 use crate::{
     api::error::{ApiError, ApiErrorKind},
-    application::security::auth_error::AuthError,
     domain::{errors::RepositoryError, validation_issue::ValidationIssue},
     infrastructure::redis::cache_error::CacheError,
 };
+use auth::auth_error::AuthError;
 
 #[derive(Debug, Error)]
 pub enum ShortUrlError {

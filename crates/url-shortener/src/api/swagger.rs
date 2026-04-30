@@ -19,9 +19,9 @@ use crate::{
         },
         server,
     },
-    application::security::jwt::JwtTokens,
     domain::{models::short_url::ShortUrl, validation_issue::ValidationIssue},
 };
+use auth::jwt::JwtTokens;
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct StatusResponse {

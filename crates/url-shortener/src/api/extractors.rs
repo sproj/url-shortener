@@ -11,15 +11,10 @@ use axum_extra::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    api::error::ApiError,
-    application::{
-        security::{
-            auth_error::AuthError,
-            jwt::{AccessClaims, ClaimsMethods, JwtTokenType, RefreshClaims, decode_token},
-        },
-        state::SharedState,
-    },
+use crate::{api::error::ApiError, application::state::SharedState};
+use auth::{
+    auth_error::AuthError,
+    jwt::{AccessClaims, ClaimsMethods, JwtTokenType, RefreshClaims, decode_token},
 };
 
 impl<S> FromRequestParts<S> for AccessClaims

@@ -3,21 +3,19 @@ use std::sync::Arc;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::application::{
-    security::{
-        auth::{
-            compare_password_hashes, encode_tokens, generate_claims, generate_password_hash,
-            generate_salt, validate_token_type,
-        },
-        auth_error::AuthError,
-        jwt::{ClaimsMethods, JwtTokenType, JwtTokens, RefreshClaims},
+use crate::application::service::{
+    auth::{
+        auth_service_trait::AuthServiceTrait, refresh_token_cache_trait::RefreshTokenCacheTrait,
     },
-    service::{
-        auth::{
-            auth_service_trait::AuthServiceTrait, refresh_token_cache_trait::RefreshTokenCacheTrait,
-        },
-        user::{login_params::LoginParams, user_service_trait::UserServiceTrait},
+    user::{login_params::LoginParams, user_service_trait::UserServiceTrait},
+};
+use auth::{
+    auth::{
+        compare_password_hashes, encode_tokens, generate_claims, generate_password_hash,
+        generate_salt, validate_token_type,
     },
+    auth_error::AuthError,
+    jwt::{ClaimsMethods, JwtTokenType, JwtTokens, RefreshClaims},
 };
 
 pub struct AuthService {
@@ -198,21 +196,13 @@ impl AuthServiceTrait for AuthService {
 mod tests {
     use std::sync::Arc;
 
-    use chrono::Utc;
-
     use crate::{
-        application::{
-            security::{
-                auth::{generate_claims, generate_password_hash, generate_salt},
-                jwt::{JwtTokenType, RefreshClaims},
+        application::service::{
+            auth::{
+                refresh_token_cache::mocks::MockRefreshTokenCache,
+                refresh_token_cache_trait::NoopRefreshTokenCache,
             },
-            service::{
-                auth::{
-                    refresh_token_cache::mocks::MockRefreshTokenCache,
-                    refresh_token_cache_trait::NoopRefreshTokenCache,
-                },
-                user::user_service::UsersService,
-            },
+            user::user_service::UsersService,
         },
         domain::{
             errors::RepositoryError,
@@ -221,6 +211,11 @@ mod tests {
             user_spec::UserSpec,
         },
     };
+    use auth::{
+        auth::{generate_claims, generate_password_hash, generate_salt},
+        jwt::{JwtTokenType, RefreshClaims},
+    };
+    use chrono::Utc;
 
     use super::*;
 

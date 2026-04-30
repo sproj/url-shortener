@@ -7,7 +7,7 @@ use rand_core::OsRng;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::application::security::{
+use crate::{
     auth_error::AuthError,
     jwt::{AccessClaims, JwtTokenType, JwtTokens, RefreshClaims},
 };
@@ -145,7 +145,7 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
-    use crate::application::security::auth_error::AuthError;
+    use crate::auth_error::AuthError;
 
     fn test_encoding_key() -> EncodingKey {
         EncodingKey::from_secret(b"test-secret-for-auth-rs-unit-tests")
