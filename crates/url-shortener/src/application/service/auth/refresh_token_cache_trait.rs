@@ -1,6 +1,5 @@
-use crate::{
-    application::security::jwt::RefreshClaims, infrastructure::redis::cache_error::CacheError,
-};
+use crate::infrastructure::redis::cache_error::CacheError;
+use auth::jwt::RefreshClaims;
 
 #[async_trait::async_trait]
 pub trait RefreshTokenCacheTrait: Send + Sync {

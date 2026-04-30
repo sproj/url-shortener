@@ -146,10 +146,8 @@ mod tests {
     use jsonwebtoken::{DecodingKey, EncodingKey};
 
     use super::*;
-    use crate::application::{
-        config::{AppConfig, Config, DbConfig, JwtConfig, RedisConfig},
-        security::jwt::JwtKeys,
-    };
+    use crate::application::config::{AppConfig, Config, DbConfig, JwtConfig, RedisConfig};
+    use auth::jwt::JwtKeys;
     use std::net::TcpListener as StdTcpListener;
 
     #[tokio::test]

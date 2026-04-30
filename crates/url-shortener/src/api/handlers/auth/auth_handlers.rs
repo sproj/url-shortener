@@ -13,15 +13,12 @@ use crate::{
         handlers::{auth::login_request::LoginRequest, users::user_response::UserResponse},
         swagger::LoginResponse,
     },
-    application::{
-        security::{
-            auth_error::AuthError,
-            jwt::{AccessClaims, JwtTokens, RefreshClaims},
-        },
-        service::user::login_params::LoginParams,
-        state::SharedState,
-    },
+    application::{service::user::login_params::LoginParams, state::SharedState},
     domain::errors::UserError,
+};
+use auth::{
+    auth_error::AuthError,
+    jwt::{AccessClaims, JwtTokens, RefreshClaims},
 };
 
 #[utoipa::path(

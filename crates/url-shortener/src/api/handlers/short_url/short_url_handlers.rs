@@ -16,14 +16,14 @@ use crate::{
         },
     },
     application::{
-        security::{
-            auth_error::AuthError,
-            jwt::{AccessClaims, ClaimsMethods},
-        },
         service::short_url::{ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest},
         state::SharedState,
     },
     domain::{errors::ShortUrlError, models::short_url::ShortUrl},
+};
+use auth::{
+    auth_error::AuthError,
+    jwt::{AccessClaims, ClaimsMethods},
 };
 
 #[utoipa::path(

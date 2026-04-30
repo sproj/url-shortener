@@ -1,5 +1,6 @@
 use std::{ops::Sub, sync::Arc};
 
+use auth::auth_error::AuthError;
 use chrono::{TimeDelta, Utc};
 use metrics::{counter, gauge};
 use serde::{Deserialize, Serialize};
@@ -7,13 +8,10 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        security::auth_error::AuthError,
-        service::short_url::{
-            ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
-            code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
-            short_url_service_trait::ShortUrlServiceTrait,
-        },
+    application::service::short_url::{
+        ValidatedCreateShortUrlRequest, ValidatedUpdateShortUrlRequest,
+        code_generator::CodeGenerator, redirect_cache_trait::RedirectCache,
+        short_url_service_trait::ShortUrlServiceTrait,
     },
     domain::{
         errors::{RepositoryError, ShortUrlError},
@@ -438,15 +436,13 @@ impl ShortUrlServiceTrait for ShortUrlService {
 
 #[cfg(test)]
 mod tests {
+    use auth::auth_error::AuthError;
     use chrono::{Duration, Utc};
 
     use crate::{
-        application::{
-            security::auth_error::AuthError,
-            service::short_url::{
-                code_generator::FixedCodeGenerator,
-                redirect_cache_trait::{NoopRedirectCache, mocks::RecordingRedirectCache},
-            },
+        application::service::short_url::{
+            code_generator::FixedCodeGenerator,
+            redirect_cache_trait::{NoopRedirectCache, mocks::RecordingRedirectCache},
         },
         domain::{
             models::{short_url::ShortUrl, user::User},

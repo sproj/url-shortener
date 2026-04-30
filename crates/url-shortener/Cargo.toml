@@ -4,14 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+auth = { path = "../auth" }
 axum = { version = "0.8", features = ["macros"] }
 base64-url = "3.0.2"
 chrono = { version = "0.4.43", features = ["serde"] }
 deadpool-postgres = "0.14.1"
 deadpool-redis = { version = "0.23.0", features = ["rt_tokio_1", "serde"] }
 dotenvy = "0.15.7"
-rand = "0.10.0"
-rand_core = { version = "0.6", features = ["getrandom"] }
 refinery = { version = "0.9.0", features = ["tokio-postgres"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -35,13 +34,12 @@ url = "2.5.8"
 uuid = { version = "1.21.0", features = ["v7", "serde"] }
 redis = { version = "1.0.5", features = ["tokio-comp"] }
 async-trait = "0.1.89"
-argon2 = "0.5.3"
-ed25519-dalek = "2.2.0"
-jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "use_pem"] }
+rand = "0.10.0"
 axum-extra = { version = "0.12.5", features = ["typed-header"] }
 metrics = "0.24.3"
 axum-prometheus = "0.10.0"
 lapin = "4.6.0"
+jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "use_pem"] }
 
 [dev-dependencies]
 reqwest = { version = "0.13.1", features = ["json"] }

@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use utoipa::ToSchema;
 
-use crate::application::{
-    constants::USER_ROLE_ADMIN,
-    security::{auth_error::AuthError, roles},
+use crate::{
+    auth_error::AuthError,
+    roles::{USER_ROLE_ADMIN, is_role_admin},
 };
 
 #[derive(Clone)]
@@ -163,7 +163,7 @@ impl ClaimsMethods for AccessClaims {
 impl ClaimsMethods for RefreshClaims {
     const EXPECTED_TYPE: JwtTokenType = JwtTokenType::RefreshToken;
     fn validate_role_admin(&self) -> Result<(), AuthError> {
-        roles::is_role_admin(&self.roles)
+        is_role_admin(&self.roles)
     }
     fn get_sub(&self) -> &str {
         &self.sub
@@ -192,29 +192,10 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::{
-        application::security::auth::{encode_tokens, generate_claims},
-        domain::models::user::User,
-    };
+    use crate::auth::{encode_tokens, generate_claims};
 
     fn test_keys() -> JwtKeys {
         JwtKeys::new(b"test-secret-for-unit-tests-only-32b")
-    }
-
-    fn make_test_user() -> User {
-        User {
-            id: 1,
-            uuid: Uuid::now_v7(),
-            username: "testuser".to_string(),
-            email: "test@example.com".to_string(),
-            password_hash: "hash".to_string(),
-            password_salt: "salt".to_string(),
-            active: true,
-            roles: "user".to_string(),
-            created_at: Utc::now(),
-            updated_at: None,
-            deleted_at: None,
-        }
     }
 
     fn make_claims_with_roles(roles: &str) -> AccessClaims {
@@ -243,6 +224,14 @@ mod tests {
         }
     }
 
+    fn test_sub() -> Uuid {
+        uuid::Uuid::now_v7()
+    }
+
+    fn test_roles() -> String {
+        "user,admin".to_string()
+    }
+
     #[test]
     fn jwt_token_type_from_maps_expected_variants() {
         assert_eq!(JwtTokenType::from(0), JwtTokenType::AccessToken);
@@ -255,10 +244,10 @@ mod tests {
     #[test]
     fn token_sub_matches_user_uuid() {
         let keys = test_keys();
-        let user = make_test_user();
-        let expected_uuid = user.uuid.to_string();
+        let sub = test_sub();
+        let expected_uuid = sub.to_string();
 
-        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
+        let claims = generate_claims(120, 750, sub, test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -269,10 +258,9 @@ mod tests {
     #[test]
     fn token_roles_match_user_roles() {
         let keys = test_keys();
-        let mut user = make_test_user();
-        user.roles = "admin,user".to_string();
+        let roles = "admin,user".to_string();
 
-        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
+        let claims = generate_claims(120, 750, test_sub(), roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -283,11 +271,10 @@ mod tests {
     #[test]
     fn token_exp_is_approximately_now_plus_expiry() {
         let keys = test_keys();
-        let user = make_test_user();
         let expiry_seconds = 300;
         let before = Utc::now().timestamp();
 
-        let claims = generate_claims(expiry_seconds, -750, user.uuid, user.roles).unwrap();
+        let claims = generate_claims(expiry_seconds, -750, test_sub(), test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -300,8 +287,7 @@ mod tests {
     #[test]
     fn token_aud_and_iss_are_set() {
         let keys = test_keys();
-        let user = make_test_user();
-        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
+        let claims = generate_claims(120, 750, test_sub(), test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -313,8 +299,8 @@ mod tests {
     #[test]
     fn token_jti_is_non_empty() {
         let keys = test_keys();
-        let user = make_test_user();
-        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
+
+        let claims = generate_claims(120, 750, test_sub(), test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -327,9 +313,9 @@ mod tests {
     #[test]
     fn decode_rejects_expired_token() {
         let keys = test_keys();
-        let user = make_test_user();
+
         // exp = now - 120s, leeway = 60s, so this is definitely expired
-        let claims = generate_claims(-120, -60, user.uuid, user.roles).unwrap();
+        let claims = generate_claims(-120, -60, test_sub(), test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 
@@ -342,8 +328,8 @@ mod tests {
     fn decode_rejects_wrong_key() {
         let keys = test_keys();
         let other_keys = JwtKeys::new(b"a-completely-different-secret-key");
-        let user = make_test_user();
-        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
+
+        let claims = generate_claims(120, 750, test_sub(), test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 
@@ -355,8 +341,8 @@ mod tests {
     #[test]
     fn decode_rejects_tampered_payload() {
         let keys = test_keys();
-        let user = make_test_user();
-        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
+
+        let claims = generate_claims(120, 750, test_sub(), test_roles()).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 

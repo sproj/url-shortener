@@ -1,6 +1,6 @@
+use crate::application::startup_error::StartupError;
+use auth::jwt::JwtKeys;
 use std::net::SocketAddr;
-
-use crate::application::{security::jwt::JwtKeys, startup_error::StartupError};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -180,7 +180,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::application::security::jwt::JwtKeys;
+    use auth::jwt::JwtKeys;
 
     use super::*;
     use std::sync::{Mutex, MutexGuard};

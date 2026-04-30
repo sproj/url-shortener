@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use crate::application::{
-    constants::{USER_ROLE_ADMIN, USER_ROLE_CUSTOMER, USER_ROLE_GUEST},
-    security::auth_error::AuthError,
-};
+use crate::auth_error::AuthError;
 
 /// User roles.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -12,6 +9,11 @@ pub enum UserRole {
     Customer,
     Guest,
 }
+
+// Roles.
+pub const USER_ROLE_ADMIN: &str = "admin";
+pub const USER_ROLE_CUSTOMER: &str = "customer";
+pub const USER_ROLE_GUEST: &str = "guest";
 
 impl TryFrom<&str> for UserRole {
     type Error = &'static str;

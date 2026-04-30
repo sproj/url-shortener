@@ -302,6 +302,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "auth"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "chrono",
+ "ed25519-dalek",
+ "jsonwebtoken",
+ "rand 0.10.1",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5052,8 +5070,8 @@ dependencies = [
 name = "url-shortener"
 version = "0.1.0"
 dependencies = [
- "argon2",
  "async-trait",
+ "auth",
  "axum",
  "axum-extra",
  "axum-prometheus",
@@ -5062,7 +5080,6 @@ dependencies = [
  "deadpool-postgres",
  "deadpool-redis",
  "dotenvy",
- "ed25519-dalek",
  "jsonwebtoken",
  "lapin",
  "metrics",
@@ -5070,7 +5087,6 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry_sdk",
  "rand 0.10.1",
- "rand_core 0.6.4",
  "redis",
  "refinery",
  "reqwest 0.13.3",
