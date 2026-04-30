@@ -1,7 +1,5 @@
-use axum::{Json, response::IntoResponse};
 use jsonwebtoken::{DecodingKey, EncodingKey, errors::ErrorKind};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::fmt::Display;
 use utoipa::ToSchema;
 
@@ -35,15 +33,6 @@ impl JwtKeys {
 pub struct JwtTokens {
     pub access_token: String,
     pub refresh_token: String,
-}
-
-pub fn tokens_to_response(jwt_tokens: JwtTokens) -> impl IntoResponse {
-    let json = json!({
-        "access_token": jwt_tokens.access_token,
-        "refresh_token": jwt_tokens.refresh_token,
-        "token_type": "Bearer"
-    });
-    Json(json)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -199,7 +188,6 @@ impl ClaimsMethods for RefreshClaims {
 
 #[cfg(test)]
 mod tests {
-    use axum::body::to_bytes;
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -253,22 +241,6 @@ mod tests {
             typ: JwtTokenType::RefreshToken as u8,
             roles: roles.to_string(),
         }
-    }
-
-    #[tokio::test]
-    async fn tokens_to_response_includes_bearer_and_both_tokens() {
-        let response = tokens_to_response(JwtTokens {
-            access_token: "access-token".to_string(),
-            refresh_token: "refresh-token".to_string(),
-        })
-        .into_response();
-
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        let actual: serde_json::Value = serde_json::from_slice(&body).unwrap();
-
-        assert_eq!(actual["access_token"], "access-token");
-        assert_eq!(actual["refresh_token"], "refresh-token");
-        assert_eq!(actual["token_type"], "Bearer");
     }
 
     #[test]
