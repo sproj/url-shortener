@@ -65,7 +65,8 @@ impl AuthServiceTrait for AuthService {
                 generate_claims(
                     self.jwt_access_token_seconds,
                     self.jwt_refresh_token_seconds,
-                    user,
+                    user.uuid,
+                    user.roles,
                 )
             }
             None => {
@@ -163,7 +164,8 @@ impl AuthServiceTrait for AuthService {
                 let claims = generate_claims(
                     self.jwt_access_token_seconds,
                     self.jwt_refresh_token_seconds,
-                    user,
+                    user.uuid,
+                    user.roles,
                 )?;
 
                 self.cache_refresh_token(&claims.refresh_claims).await?;
@@ -328,7 +330,7 @@ mod tests {
     }
 
     fn make_refresh_claims(user: &User) -> RefreshClaims {
-        generate_claims(300, 900, user.clone())
+        generate_claims(300, 900, user.uuid, user.roles.clone())
             .unwrap()
             .refresh_claims
     }
