@@ -286,7 +286,7 @@ mod tests {
         let user = make_test_user();
         let expected_uuid = user.uuid.to_string();
 
-        let claims = generate_claims(120, 750, user).unwrap();
+        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -300,7 +300,7 @@ mod tests {
         let mut user = make_test_user();
         user.roles = "admin,user".to_string();
 
-        let claims = generate_claims(120, 750, user).unwrap();
+        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -315,7 +315,7 @@ mod tests {
         let expiry_seconds = 300;
         let before = Utc::now().timestamp();
 
-        let claims = generate_claims(expiry_seconds, -750, user).unwrap();
+        let claims = generate_claims(expiry_seconds, -750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -328,8 +328,8 @@ mod tests {
     #[test]
     fn token_aud_and_iss_are_set() {
         let keys = test_keys();
-
-        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let user = make_test_user();
+        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -341,8 +341,8 @@ mod tests {
     #[test]
     fn token_jti_is_non_empty() {
         let keys = test_keys();
-
-        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let user = make_test_user();
+        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
         let actual: AccessClaims = decode_token(&tokens.access_token, &keys.decoding).unwrap();
@@ -355,8 +355,9 @@ mod tests {
     #[test]
     fn decode_rejects_expired_token() {
         let keys = test_keys();
+        let user = make_test_user();
         // exp = now - 120s, leeway = 60s, so this is definitely expired
-        let claims = generate_claims(-120, -60, make_test_user()).unwrap();
+        let claims = generate_claims(-120, -60, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 
@@ -369,8 +370,8 @@ mod tests {
     fn decode_rejects_wrong_key() {
         let keys = test_keys();
         let other_keys = JwtKeys::new(b"a-completely-different-secret-key");
-
-        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let user = make_test_user();
+        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 
@@ -382,7 +383,8 @@ mod tests {
     #[test]
     fn decode_rejects_tampered_payload() {
         let keys = test_keys();
-        let claims = generate_claims(120, 750, make_test_user()).unwrap();
+        let user = make_test_user();
+        let claims = generate_claims(120, 750, user.uuid, user.roles).unwrap();
         let tokens =
             encode_tokens(&keys.encoding, claims.access_claims, claims.refresh_claims).unwrap();
 

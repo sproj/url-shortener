@@ -7,12 +7,9 @@ use rand_core::OsRng;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{
-    application::security::{
-        auth_error::AuthError,
-        jwt::{AccessClaims, JwtTokenType, JwtTokens, RefreshClaims},
-    },
-    domain::models::user::User,
+use crate::application::security::{
+    auth_error::AuthError,
+    jwt::{AccessClaims, JwtTokenType, JwtTokens, RefreshClaims},
 };
 
 #[instrument(skip_all)]
@@ -60,15 +57,16 @@ pub struct GeneratedClaimsDto {
     pub refresh_claims: RefreshClaims,
 }
 
-#[instrument(skip(user), fields(user.uuid = %user.uuid, user.email = %user.email, user.username=%user.username))]
+#[instrument(fields(sub = %sub))]
 pub fn generate_claims(
     access_token_expiry_seconds: i64,
     refresh_token_expiry_seconds: i64,
-    user: User,
+    sub: Uuid,
+    roles: String,
 ) -> Result<GeneratedClaimsDto, AuthError> {
     let time_now = chrono::Utc::now();
     let iat = time_now.timestamp() as usize;
-    let sub = user.uuid.to_string();
+    let sub = sub.to_string();
 
     let access_token_id = Uuid::now_v7().to_string();
     let refresh_token_id = Uuid::now_v7().to_string();
@@ -83,7 +81,7 @@ pub fn generate_claims(
         jti: access_token_id.clone(),
         iat,
         exp: access_token_exp,
-        roles: user.roles.clone(),
+        roles: roles.clone(),
         aud: "url-shortener".to_string(),
         iss: "url-shortener".to_string(),
         typ: JwtTokenType::AccessToken as u8,
@@ -97,7 +95,7 @@ pub fn generate_claims(
         prf: access_token_id,
         pex: access_token_exp,
         typ: JwtTokenType::RefreshToken as u8,
-        roles: user.roles,
+        roles,
     };
 
     tracing::debug!("JWT: generated claims\naccess {:#?}", access_claims,);
@@ -153,22 +151,6 @@ mod tests {
         EncodingKey::from_secret(b"test-secret-for-auth-rs-unit-tests")
     }
 
-    fn make_test_user() -> User {
-        User {
-            id: 1,
-            uuid: Uuid::now_v7(),
-            username: "test-user".to_string(),
-            email: "test-user@example.com".to_string(),
-            password_hash: "unused-hash".to_string(),
-            password_salt: "unused-salt".to_string(),
-            active: true,
-            roles: "user,admin".to_string(),
-            created_at: Utc::now(),
-            updated_at: None,
-            deleted_at: None,
-        }
-    }
-
     fn make_refresh_claims(token_type: JwtTokenType) -> RefreshClaims {
         RefreshClaims {
             sub: Uuid::now_v7().to_string(),
@@ -180,6 +162,14 @@ mod tests {
             typ: token_type as u8,
             roles: "user".to_string(),
         }
+    }
+
+    fn test_sub() -> Uuid {
+        uuid::Uuid::now_v7()
+    }
+
+    fn test_roles() -> String {
+        "user,admin".to_string()
     }
 
     #[test]
@@ -244,10 +234,10 @@ mod tests {
 
     #[test]
     fn generate_claims_sets_subject_pairing_and_token_types() {
-        let user = make_test_user();
-        let expected_sub = user.uuid.to_string();
+        let sub = test_sub();
+        let expected_sub = sub.to_string();
 
-        let actual = generate_claims(300, 900, user).unwrap();
+        let actual = generate_claims(300, 900, sub, test_roles()).unwrap();
 
         assert_eq!(actual.access_claims.sub, expected_sub);
         assert_eq!(actual.refresh_claims.sub, expected_sub);
@@ -259,9 +249,7 @@ mod tests {
 
     #[test]
     fn generate_claims_preserves_user_roles() {
-        let user = make_test_user();
-
-        let actual = generate_claims(300, 900, user).unwrap();
+        let actual = generate_claims(300, 900, test_sub(), test_roles()).unwrap();
 
         assert_eq!(actual.access_claims.roles, "user,admin");
         assert_eq!(actual.refresh_claims.roles, "user,admin");
@@ -269,9 +257,7 @@ mod tests {
 
     #[test]
     fn generate_claims_sets_expected_expiry_order() {
-        let user = make_test_user();
-
-        let actual = generate_claims(60, 300, user).unwrap();
+        let actual = generate_claims(60, 300, test_sub(), test_roles()).unwrap();
 
         assert!(actual.access_claims.exp > actual.access_claims.iat);
         assert!(actual.refresh_claims.exp > actual.refresh_claims.iat);
@@ -280,7 +266,7 @@ mod tests {
 
     #[test]
     fn encode_tokens_returns_non_empty_tokens() {
-        let claims = generate_claims(300, 900, make_test_user()).unwrap();
+        let claims = generate_claims(300, 900, test_sub(), test_roles()).unwrap();
 
         let actual = encode_tokens(
             &test_encoding_key(),
