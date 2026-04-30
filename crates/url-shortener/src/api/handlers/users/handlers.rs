@@ -1,3 +1,4 @@
+use crate::application::security::claims::AccessClaims;
 use crate::{
     api::{
         error::ApiError,
@@ -9,7 +10,7 @@ use crate::{
     application::{service::user::create_user_params::CreateUserParams, state::SharedState},
     domain::errors::UserError,
 };
-use auth::jwt::{AccessClaims, ClaimsMethods};
+use auth::jwt::ClaimsMethods;
 use axum::{
     Json,
     extract::{Path, State, rejection::JsonRejection},

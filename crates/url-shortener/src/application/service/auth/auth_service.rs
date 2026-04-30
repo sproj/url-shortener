@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tracing::instrument;
 use uuid::Uuid;
 
+use crate::application::security::{claims::RefreshClaims, generate_tokens::generate_claims};
 use crate::application::service::{
     auth::{
         auth_service_trait::AuthServiceTrait, refresh_token_cache_trait::RefreshTokenCacheTrait,
@@ -10,12 +11,9 @@ use crate::application::service::{
     user::{login_params::LoginParams, user_service_trait::UserServiceTrait},
 };
 use auth::{
-    auth::{
-        compare_password_hashes, encode_tokens, generate_claims, generate_password_hash,
-        generate_salt, validate_token_type,
-    },
+    auth::{compare_password_hashes, encode_tokens, generate_password_hash, generate_salt},
     auth_error::AuthError,
-    jwt::{ClaimsMethods, JwtTokenType, JwtTokens, RefreshClaims},
+    jwt::{ClaimsMethods, JwtTokenType, JwtTokens},
 };
 
 pub struct AuthService {
@@ -114,7 +112,7 @@ impl AuthServiceTrait for AuthService {
     #[instrument(skip(self), fields(sub = %refresh_claims.sub))]
     async fn refresh(&self, refresh_claims: RefreshClaims) -> Result<JwtTokens, AuthError> {
         let jti = refresh_claims.get_jti();
-        if !validate_token_type(&refresh_claims, JwtTokenType::RefreshToken) {
+        if refresh_claims.typ != JwtTokenType::RefreshToken as u8 {
             tracing::error!(%jti, "non-refresh token presented for refresh");
             return Err(AuthError::InvalidToken);
         }
@@ -196,6 +194,7 @@ impl AuthServiceTrait for AuthService {
 mod tests {
     use std::sync::Arc;
 
+    use crate::application::security::{claims::RefreshClaims, generate_tokens::generate_claims};
     use crate::{
         application::service::{
             auth::{
@@ -212,8 +211,8 @@ mod tests {
         },
     };
     use auth::{
-        auth::{generate_claims, generate_password_hash, generate_salt},
-        jwt::{JwtTokenType, RefreshClaims},
+        auth::{generate_password_hash, generate_salt},
+        jwt::JwtTokenType,
     };
     use chrono::Utc;
 

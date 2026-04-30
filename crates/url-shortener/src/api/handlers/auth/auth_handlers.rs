@@ -7,6 +7,7 @@ use serde_json::json;
 use tracing::instrument;
 use uuid::Uuid;
 
+use crate::application::security::claims::{AccessClaims, RefreshClaims};
 use crate::{
     api::{
         error::ApiError,
@@ -16,10 +17,7 @@ use crate::{
     application::{service::user::login_params::LoginParams, state::SharedState},
     domain::errors::UserError,
 };
-use auth::{
-    auth_error::AuthError,
-    jwt::{AccessClaims, JwtTokens, RefreshClaims},
-};
+use auth::{auth_error::AuthError, jwt::JwtTokens};
 
 #[utoipa::path(
     post,

@@ -1,10 +1,13 @@
+use auth::{
+    decode_token,
+    jwt::{JwtTokenType, JwtTokens},
+};
 use reqwest::StatusCode;
 use serde_json::json;
+
 use url_shortener::{
     api::handlers::users::user_response::UserResponse,
-    application::security::jwt::{
-        AccessClaims, JwtTokenType, JwtTokens, RefreshClaims, decode_token,
-    },
+    application::security::claims::{AccessClaims, RefreshClaims},
 };
 
 use crate::common::{
