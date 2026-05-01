@@ -1,3 +1,5 @@
+use api_gateway::application::{app::App, config, startup_error::StartupError};
+use api_gateway::infrastructure::{database::postgres::Database, redis::connect};
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, trace as sdktrace};
@@ -6,8 +8,6 @@ use tracing_subscriber::Layer;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use api_gateway::application::{app::App, config, startup_error::StartupError};
-use api_gateway::infrastructure::{database::postgres::Database, redis::connect};
 
 #[tokio::main]
 async fn main() -> Result<(), StartupError> {
@@ -72,11 +72,7 @@ fn init_tracer() -> sdktrace::SdkTracerProvider {
 
     let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
-        .with_resource(
-            Resource::builder()
-                .with_service_name("api-gateway")
-                .build(),
-        )
+        .with_resource(Resource::builder().with_service_name("api-gateway").build())
         .build();
 
     opentelemetry::global::set_tracer_provider(provider.clone());
