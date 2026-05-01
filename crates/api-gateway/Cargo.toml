@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 auth = { path = "../auth" }
+common = { path = "../common" }
 axum.workspace = true
 chrono.workspace = true
 deadpool-postgres.workspace = true
