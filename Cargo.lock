@@ -101,6 +101,7 @@ dependencies = [
  "auth",
  "axum",
  "axum-extra",
+ "axum-prometheus",
  "chrono",
  "common",
  "deadpool-postgres",
