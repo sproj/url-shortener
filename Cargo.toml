@@ -1,3 +1,42 @@
 [workspace]
 resolver = "3"
-members = ["crates/url-shortener", "crates/auth"]
+members = [
+    "crates/url-shortener",
+    "crates/auth",
+    "crates/api-gateway",
+    "crates/common",
+]
+
+[workspace.dependencies]
+axum = { version = "0.8", features = ["macros"] }
+chrono = { version = "0.4.43", features = ["serde"] }
+deadpool-postgres = "0.14.1"
+deadpool-redis = { version = "0.23.0", features = ["rt_tokio_1", "serde"] }
+dotenvy = "0.15.7"
+refinery = { version = "0.9.0", features = ["tokio-postgres"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tokio = { version = "1.48", features = ["full"] }
+tokio-postgres = { version = "0.7.16", features = [
+    "with-serde_json-1",
+    "with-chrono-0_4",
+    "with-uuid-1",
+] }
+tower-http = { version = "0.6.8", features = ["normalize-path"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-opentelemetry = "0.32.1"
+opentelemetry = "0.31.0"
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.31.1", features = ["grpc-tonic"] }
+utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+async-trait = "0.1.89"
+axum-extra = { version = "0.12.5", features = ["typed-header"] }
+metrics = "0.24.3"
+axum-prometheus = "0.10.0"
+url = "2.5.8"
+uuid = { version = "1.21.0", features = ["v7", "serde"] }
+redis = { version = "1.0.5", features = ["tokio-comp"] }
+jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "use_pem"] }
