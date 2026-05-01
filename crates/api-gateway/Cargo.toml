@@ -1,12 +1,11 @@
 [package]
-name = "url-shortener"
+name = "api-gateway"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 auth = { path = "../auth" }
 axum.workspace = true
-base64-url = "3.0.2"
 chrono.workspace = true
 deadpool-postgres.workspace = true
 deadpool-redis.workspace = true
@@ -30,18 +29,6 @@ url.workspace = true
 uuid.workspace = true
 redis.workspace = true
 async-trait.workspace = true
-rand = "0.10.0"
 axum-extra.workspace = true
 metrics.workspace = true
-axum-prometheus.workspace = true
-lapin = "4.6.0"
 jsonwebtoken.workspace = true
-
-[dev-dependencies]
-reqwest = { version = "0.13.1", features = ["json"] }
-testcontainers = { version = "0.27.1", features = ["docker-compose"] }
-testcontainers-modules = { version = "0.15.0", features = [
-    "postgres",
-    "redis",
-] }
-tracing-subscriber.workspace = true

@@ -94,6 +94,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "api-gateway"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "auth",
+ "axum",
+ "axum-extra",
+ "chrono",
+ "deadpool-postgres",
+ "deadpool-redis",
+ "dotenvy",
+ "jsonwebtoken",
+ "metrics",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "redis",
+ "refinery",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-postgres",
+ "tower-http",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "url",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "uuid",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -749,6 +783,17 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "deadpool-postgres",
+ "deadpool-redis",
+ "redis",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
