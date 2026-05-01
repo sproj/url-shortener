@@ -80,9 +80,10 @@ pub fn decode_token<T: for<'de> serde::Deserialize<'de>>(
     let mut validation = jsonwebtoken::Validation::default();
     // todo: reckon hardcoding better than putting jwt config on State - think it through.
     validation.leeway = 60u64;
-    validation.set_audience(&["url-shortener"]);
-    validation.set_issuer(&["url-shortener"]);
-    validation.set_required_spec_claims(&["prf", "pex"]);
+    validation.validate_aud = false;
+    // validation.set_audience(&["url-shortener"]);
+    // validation.set_issuer(&["api-gateway"]);
+    // validation.set_required_spec_claims(&["prf", "pex"]);
 
     let token_data = jsonwebtoken::decode::<T>(token, decoding_key, &validation).map_err(|e| {
         tracing::warn!(%e, "token validation rejected");
