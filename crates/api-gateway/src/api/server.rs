@@ -2,6 +2,7 @@ use crate::{
     api::{
         handlers::auth::auth_handlers::{login, logout, refresh},
         routes::users_routes,
+        swagger::{ApiDoc, StatusResponse},
         // swagger::{ApiDoc, StatusResponse},
     },
     application::{config::Config, startup_error::StartupError, state::SharedState},
@@ -37,7 +38,7 @@ pub async fn listen(config: Config) -> Result<TcpListener, StartupError> {
 }
 
 pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), StartupError> {
-    // let openapi = ApiDoc::openapi();
+    let openapi = ApiDoc::openapi();
 
     let prometheus_layer = PrometheusMetricLayer::default();
     let metric_handle = get_or_init_metrics_handle();
@@ -49,8 +50,8 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
         .nest("/users", users_routes::routes())
-        // .route("/metrics", get(async move || metric_handle.render()))
-        // .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
+        .route("/metrics", get(async move || metric_handle.render()))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .fallback(error_404_handler)
         .layer(NormalizePathLayer::trim_trailing_slash())
         .layer(prometheus_layer)
@@ -73,14 +74,14 @@ fn get_or_init_metrics_handle() -> PrometheusHandle {
         .clone()
 }
 
-// #[utoipa::path(
-//     get,
-//     path = "/health",
-//     tag = "system",
-//     responses(
-//         (status = 200, description = "Service is healthy", body = StatusResponse)
-//     )
-// )]
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "system",
+    responses(
+        (status = 200, description = "Service is healthy", body = StatusResponse)
+    )
+)]
 // health request handler
 pub(crate) async fn health_handler() -> Result<impl IntoResponse, ()> {
     Ok(Json(json!({"status": "healthy"})))
