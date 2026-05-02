@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::{
     domain::errors::RepositoryError, infrastructure::database::database_error::DatabaseError,
@@ -16,7 +17,7 @@ pub struct ShortUrl {
     pub code: String,
     pub long_url: String,
     pub expires_at: Option<DateTime<Utc>>,
-    pub user_id: Option<i64>,
+    pub user_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -69,7 +70,7 @@ impl TryFrom<&Row> for ShortUrl {
                 .try_get("expires_at")
                 .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
             user_id: row
-                .try_get::<_, Option<i64>>("user_id")
+                .try_get::<_, Option<Uuid>>("user_id")
                 .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
             created_at: row
                 .try_get("created_at")
