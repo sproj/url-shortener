@@ -3,7 +3,6 @@ use crate::{
 };
 
 pub mod short_url_repository;
-pub mod users_repository;
 
 pub type RepositoryResult<T> = Result<T, RepositoryError>;
 

@@ -1,22 +1,16 @@
 use std::sync::Arc;
 
 use crate::application::repository::short_url_repository::PostgresShortUrlRepository;
-use crate::application::repository::users_repository::PostgresUsersRepository;
 use crate::application::service::analytics::analytics_publisher_trait::{
     AnalyticsPublisherTrait, NoopAnalyticsPublisher,
 };
-use crate::application::service::auth::auth_service::AuthService;
-use crate::application::service::auth::refresh_token_cache::RefreshTokenCache;
-use crate::application::service::auth::refresh_token_cache_trait::{
-    NoopRefreshTokenCache, RefreshTokenCacheTrait,
-};
+
 use crate::application::service::short_url::code_generator::{CodeGenerator, RandomCodeGenerator};
 use crate::application::service::short_url::redirect_cache::RedirectCacheChecker;
 use crate::application::service::short_url::redirect_cache_trait::{
     NoopRedirectCache, RedirectCache,
 };
 use crate::application::service::short_url::short_url_service::ShortUrlService;
-use crate::application::service::user::user_service::UsersService;
 use crate::application::startup_error::StartupError;
 use crate::application::state::{AppState, SharedState};
 use crate::infrastructure::messaging::rabbitmq::RabbitMqPublisher;
@@ -106,10 +100,7 @@ impl AppBuilder {
             Some(conn) => Arc::new(RedirectCacheChecker::new(conn.clone())),
             None => Arc::new(NoopRedirectCache),
         };
-        let refresh_token_cache: Arc<dyn RefreshTokenCacheTrait> = match &self.redis {
-            Some(conn) => Arc::new(RefreshTokenCache::new(conn.clone())),
-            None => Arc::new(NoopRefreshTokenCache),
-        };
+
         let analytics_publisher: Arc<dyn AnalyticsPublisherTrait> = match self.rabbitmq {
             Some(channel) => {
                 let (exchange, routing_key) = self
@@ -129,9 +120,6 @@ impl AppBuilder {
         };
 
         let short_url_repository = Arc::new(PostgresShortUrlRepository::new(self.db_pool.clone()));
-        let users_repository = Arc::new(PostgresUsersRepository::new(self.db_pool.clone()));
-
-        let user_service = Arc::new(UsersService::new(users_repository.clone()));
 
         let cfg = self.config.clone();
 
@@ -139,18 +127,9 @@ impl AppBuilder {
             db_pool: self.db_pool,
             short_url_service: Arc::new(ShortUrlService::new(
                 short_url_repository,
-                users_repository.clone(),
                 redirect_cache,
                 code_generator,
                 cfg.app.max_retries,
-            )),
-            user_service: user_service.clone(),
-            auth_service: Arc::new(AuthService::new(
-                user_service,
-                refresh_token_cache,
-                cfg.jwt.jwt_expire_access_token_seconds,
-                cfg.jwt.jwt_expire_refresh_token_seconds,
-                cfg.jwt.jwt_keys.encoding.clone(),
             )),
             jwt_decoding_key: cfg.jwt.jwt_keys.decoding,
             analytics_publisher,
