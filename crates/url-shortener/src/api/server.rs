@@ -10,7 +10,7 @@ use axum::{
     extract::{Request, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::get,
 };
 use axum_prometheus::PrometheusMetricLayer;
 use serde_json::json;
