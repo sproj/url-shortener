@@ -1,7 +1,6 @@
 use crate::{
     api::{
-        handlers::auth::auth_handlers::{login, logout, refresh},
-        routes::{redirect_routes, short_url_routes, users_routes},
+        routes::{redirect_routes, short_url_routes},
         swagger::{ApiDoc, StatusResponse},
     },
     application::{config::Config, startup_error::StartupError, state::SharedState},
@@ -43,13 +42,9 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
     let metric_handle = get_or_init_metrics_handle();
 
     let router = Router::new()
-        .route("/login", post(login))
-        .route("/logout", post(logout))
-        .route("/refresh", post(refresh))
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
         .nest("/shorten", short_url_routes::routes())
-        .nest("/users", users_routes::routes())
         .nest("/r", redirect_routes::routes())
         .route("/metrics", get(async move || metric_handle.render()))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))

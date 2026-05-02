@@ -17,7 +17,7 @@ use crate::{
         errors::{RepositoryError, ShortUrlError},
         models::short_url::ShortUrl,
         short_url_spec::ShortUrlSpec,
-        traits::{ShortUrlRepositoryTrait, UsersRepositoryTrait},
+        traits::ShortUrlRepositoryTrait,
     },
 };
 
@@ -33,7 +33,6 @@ pub enum RedirectDecision {
 
 pub struct ShortUrlService {
     short_url_repository: Arc<dyn ShortUrlRepositoryTrait>,
-    users_repository: Arc<dyn UsersRepositoryTrait>,
     redirect_cache: Arc<dyn RedirectCache>,
     code_generator: Arc<dyn CodeGenerator>,
     max_retries: u8,
@@ -42,14 +41,12 @@ pub struct ShortUrlService {
 impl ShortUrlService {
     pub fn new(
         short_url_repository: Arc<dyn ShortUrlRepositoryTrait>,
-        users_repository: Arc<dyn UsersRepositoryTrait>,
         redirect_cache: Arc<dyn RedirectCache>,
         code_generator: Arc<dyn CodeGenerator>,
         max_retries: u8,
     ) -> Self {
         Self {
             short_url_repository,
-            users_repository,
             redirect_cache,
             code_generator,
             max_retries,
@@ -68,18 +65,10 @@ impl ShortUrlService {
             return Ok(());
         }
 
-        let owner_db_id = match short.user_id {
-            Some(id) => id,
-            None => return Err(ShortUrlError::Unauthorized(AuthError::Forbidden)),
-        };
-
-        if self
-            .users_repository
-            .get_user_by_uuid(user_uuid)
-            .await?
-            .is_none_or(|user| user.id != owner_db_id)
-        {
-            return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
+        if let Some(owner_uuid) = short.user_id {
+            if owner_uuid != user_uuid {
+                return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
+            }
         }
 
         Ok(())
@@ -158,17 +147,6 @@ impl ShortUrlServiceTrait for ShortUrlService {
         // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
         let uuid = uuid::Uuid::now_v7();
 
-        let mut user_id: Option<i64> = None;
-        if let Some(user_uuid) = dto.user_uuid {
-            if let Some(user) = self.users_repository.get_user_by_uuid(user_uuid).await? {
-                user_id = Some(user.id);
-            } else {
-                tracing::error!(user_uuid = %user_uuid, "Failed to find user record for owned generated code redirect request");
-                return Err(ShortUrlError::NotFound(
-                    "failed to find user creating a vanity url".to_string(),
-                ));
-            }
-        }
         for attempt in 1..=self.max_retries {
             let spec = ShortUrlSpec {
                 long_url: dto.long_url.clone(),
@@ -178,7 +156,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
                     None => self.code_generator.next_code(),
                     Some(ref vanity_url) => vanity_url.clone(),
                 },
-                user_id,
+                user_id: dto.user_uuid,
             };
 
             tracing::debug!(%attempt, %spec);
@@ -226,17 +204,6 @@ impl ShortUrlServiceTrait for ShortUrlService {
         // uuid is stable across insert attempts. `code` is re-generated on conflict (should be very rare but is possible).
         let uuid = uuid::Uuid::now_v7();
 
-        let mut user_id: Option<i64> = None;
-        if let Some(user_uuid) = dto.user_uuid {
-            if let Some(user) = self.users_repository.get_user_by_uuid(user_uuid).await? {
-                user_id = Some(user.id);
-            } else {
-                return Err(ShortUrlError::NotFound(
-                    "failed to find user creating a vanity url".to_string(),
-                ));
-            }
-        }
-
         let spec = ShortUrlSpec {
             long_url: dto.long_url.clone(),
             expires_at: dto.expires_at,
@@ -245,7 +212,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
                 None => self.code_generator.next_code(),
                 Some(ref vanity_url) => vanity_url.clone(),
             },
-            user_id,
+            user_id: dto.user_uuid,
         };
 
         tracing::debug!(%spec);
@@ -291,22 +258,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         self.require_owner_or_admin(&short, user_uuid, is_admin)
             .await?;
 
-        let short_owner_db_id = match short.user_id {
-            Some(user_db_id) => user_db_id,
-            None => return Err(ShortUrlError::Unauthorized(AuthError::Forbidden)),
-        };
-
         let old_code = short.code.clone();
-
-        if self
-            .users_repository
-            .get_user_by_uuid(user_uuid)
-            .await?
-            .is_none_or(|user| user.id != short_owner_db_id)
-        {
-            tracing::error!(%user_uuid, "vanity url update could not find user record of url owner");
-            return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
-        }
 
         let spec = ShortUrlSpec {
             uuid: short.uuid,
@@ -445,33 +397,14 @@ mod tests {
             redirect_cache_trait::{NoopRedirectCache, mocks::RecordingRedirectCache},
         },
         domain::{
-            models::{short_url::ShortUrl, user::User},
-            traits::{
-                InMemoryMockShortUrlRepository, InMemoryMockUsersRepository,
-                RetryingShortUrlRepository,
-            },
+            models::short_url::ShortUrl,
+            traits::{InMemoryMockShortUrlRepository, RetryingShortUrlRepository},
         },
     };
 
     use super::*;
 
-    fn make_user(id: i64, uuid: Uuid) -> User {
-        User {
-            id,
-            uuid,
-            username: format!("user-{id}"),
-            email: format!("user-{id}@example.com"),
-            password_hash: "hash".to_string(),
-            password_salt: "salt".to_string(),
-            active: true,
-            roles: "user".to_string(),
-            created_at: Utc::now(),
-            updated_at: None,
-            deleted_at: None,
-        }
-    }
-
-    fn make_short(uuid: Uuid, code: &str, user_id: Option<i64>) -> ShortUrl {
+    fn make_short(uuid: Uuid, code: &str, user_id: Option<Uuid>) -> ShortUrl {
         ShortUrl {
             id: 1,
             uuid,
@@ -497,14 +430,9 @@ mod tests {
         }
     }
 
-    fn make_service(
-        short_urls: Vec<ShortUrl>,
-        users: Vec<User>,
-        codes: Vec<&str>,
-    ) -> ShortUrlService {
+    fn make_service(short_urls: Vec<ShortUrl>, codes: Vec<&str>) -> ShortUrlService {
         ShortUrlService::new(
             Arc::new(InMemoryMockShortUrlRepository::new(short_urls)),
-            Arc::new(InMemoryMockUsersRepository::new(users)),
             Arc::new(NoopRedirectCache),
             Arc::new(FixedCodeGenerator::new(
                 codes.into_iter().map(str::to_string).collect(),
@@ -515,7 +443,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_all_returns_empty_correctly() {
-        let sut = make_service(vec![], vec![], vec!["generated-code"]);
+        let sut = make_service(vec![], vec!["generated-code"]);
 
         let actual = sut.get_all().await.unwrap();
 
@@ -524,7 +452,7 @@ mod tests {
 
     #[tokio::test]
     async fn add_generated_code_succeeds() {
-        let sut = make_service(vec![], vec![], vec!["generated-code"]);
+        let sut = make_service(vec![], vec!["generated-code"]);
 
         let actual = sut
             .add_generated_code(make_create_request(None, None))
@@ -539,11 +467,7 @@ mod tests {
     #[tokio::test]
     async fn add_generated_code_succeeds_for_known_user() {
         let user_uuid = Uuid::now_v7();
-        let sut = make_service(
-            vec![],
-            vec![make_user(42, user_uuid)],
-            vec!["generated-code"],
-        );
+        let sut = make_service(vec![], vec!["generated-code"]);
 
         let actual = sut
             .add_generated_code(make_create_request(None, Some(user_uuid)))
@@ -551,12 +475,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(actual.code, "generated-code");
-        assert_eq!(actual.user_id, Some(42));
+        assert_eq!(actual.user_id, Some(user_uuid));
     }
 
     #[tokio::test]
     async fn add_generated_code_returns_not_found_for_unknown_user() {
-        let sut = make_service(vec![], vec![], vec!["generated-code"]);
+        let sut = make_service(vec![], vec!["generated-code"]);
 
         let actual = sut
             .add_generated_code(make_create_request(None, Some(Uuid::now_v7())))
@@ -569,7 +493,6 @@ mod tests {
     async fn add_generated_code_retries_on_code_conflict() {
         let sut = ShortUrlService::new(
             Arc::new(RetryingShortUrlRepository::new(vec!["short_url_code_key"])),
-            Arc::new(InMemoryMockUsersRepository::new(vec![])),
             Arc::new(NoopRedirectCache),
             Arc::new(FixedCodeGenerator::new(vec![
                 "first-code".to_string(),
@@ -593,7 +516,6 @@ mod tests {
                 "short_url_code_key",
                 "short_url_code_key",
             ])),
-            Arc::new(InMemoryMockUsersRepository::new(vec![])),
             Arc::new(NoopRedirectCache),
             Arc::new(FixedCodeGenerator::new(vec![
                 "first-code".to_string(),
@@ -617,7 +539,6 @@ mod tests {
         let existing_uuid = Uuid::now_v7();
         let sut = make_service(
             vec![make_short(existing_uuid, "taken-code", None)],
-            vec![],
             vec!["unused-code"],
         );
 
@@ -631,7 +552,7 @@ mod tests {
     #[tokio::test]
     async fn get_by_uuid_returns_added_short_url() {
         let created = make_short(Uuid::now_v7(), "get-by-uuid", None);
-        let sut = make_service(vec![created.clone()], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![created.clone()], vec!["unused-code"]);
 
         let actual = sut.get_by_uuid(created.uuid).await.unwrap();
 
@@ -644,7 +565,7 @@ mod tests {
     #[tokio::test]
     async fn get_by_code_returns_added_short_url() {
         let created = make_short(Uuid::now_v7(), "get-by-code", None);
-        let sut = make_service(vec![created.clone()], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![created.clone()], vec!["unused-code"]);
 
         let actual = sut.get_by_code(&created.code).await.unwrap();
 
@@ -657,12 +578,10 @@ mod tests {
     #[tokio::test]
     async fn delete_one_succeeds_for_owner_and_invalidates_cache() {
         let user_uuid = Uuid::now_v7();
-        let user = make_user(7, user_uuid);
-        let short = make_short(Uuid::now_v7(), "delete-me", Some(user.id));
+        let short = make_short(Uuid::now_v7(), "delete-me", Some(user_uuid));
         let cache = Arc::new(RecordingRedirectCache::new());
         let sut = ShortUrlService::new(
             Arc::new(InMemoryMockShortUrlRepository::new(vec![short.clone()])),
-            Arc::new(InMemoryMockUsersRepository::new(vec![user])),
             cache.clone(),
             Arc::new(FixedCodeGenerator::new(vec!["unused-code".to_string()])),
             3,
@@ -682,7 +601,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_one_returns_not_found_for_missing_short_url() {
-        let sut = make_service(vec![], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![], vec!["unused-code"]);
 
         let actual = sut
             .delete_one_by_uuid(Uuid::now_v7(), Uuid::now_v7(), false)
@@ -694,12 +613,10 @@ mod tests {
     #[tokio::test]
     async fn update_one_by_uuid_succeeds_for_owner() {
         let user_uuid = Uuid::now_v7();
-        let user = make_user(7, user_uuid);
-        let short = make_short(Uuid::now_v7(), "old-code", Some(user.id));
+        let short = make_short(Uuid::now_v7(), "old-code", Some(user_uuid));
         let cache = Arc::new(RecordingRedirectCache::new());
         let sut = ShortUrlService::new(
             Arc::new(InMemoryMockShortUrlRepository::new(vec![short.clone()])),
-            Arc::new(InMemoryMockUsersRepository::new(vec![user])),
             cache.clone(),
             Arc::new(FixedCodeGenerator::new(vec!["unused-code".to_string()])),
             3,
@@ -727,9 +644,10 @@ mod tests {
 
     #[tokio::test]
     async fn update_one_by_uuid_returns_unauthorized_for_non_owner() {
-        let owner = make_user(7, Uuid::now_v7());
-        let short = make_short(Uuid::now_v7(), "old-code", Some(owner.id));
-        let sut = make_service(vec![short.clone()], vec![owner], vec!["unused-code"]);
+        let user_uuid = Uuid::now_v7();
+        let owner_uuid = Uuid::now_v7();
+        let short = make_short(owner_uuid, "old-code", Some(user_uuid));
+        let sut = make_service(vec![short.clone()], vec!["unused-code"]);
 
         let actual = sut
             .update_one_by_uuid(
@@ -760,7 +678,6 @@ mod tests {
         ));
         let sut = ShortUrlService::new(
             Arc::new(InMemoryMockShortUrlRepository::new(vec![])),
-            Arc::new(InMemoryMockUsersRepository::new(vec![])),
             cache,
             Arc::new(FixedCodeGenerator::new(vec!["unused-code".to_string()])),
             3,
@@ -777,7 +694,7 @@ mod tests {
     #[tokio::test]
     async fn resolve_redirect_decision_returns_permanent_for_non_expiring_short_url() {
         let short = make_short(Uuid::now_v7(), "permanent-code", None);
-        let sut = make_service(vec![short], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![short], vec!["unused-code"]);
 
         let actual = sut
             .resolve_redirect_decision("permanent-code")
@@ -794,7 +711,7 @@ mod tests {
     async fn resolve_redirect_decision_returns_temporary_for_expiring_short_url() {
         let mut short = make_short(Uuid::now_v7(), "temporary-code", None);
         short.expires_at = Some(Utc::now() + Duration::minutes(5));
-        let sut = make_service(vec![short], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![short], vec!["unused-code"]);
 
         let actual = sut
             .resolve_redirect_decision("temporary-code")
@@ -811,7 +728,7 @@ mod tests {
     async fn resolve_redirect_decision_returns_gone_for_expired_short_url() {
         let mut short = make_short(Uuid::now_v7(), "expired-code", None);
         short.expires_at = Some(Utc::now() - Duration::minutes(5));
-        let sut = make_service(vec![short], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![short], vec!["unused-code"]);
 
         let actual = sut.resolve_redirect_decision("expired-code").await.unwrap();
 
@@ -822,7 +739,7 @@ mod tests {
     async fn resolve_redirect_decision_returns_gone_for_deleted_short_url() {
         let mut short = make_short(Uuid::now_v7(), "deleted-code", None);
         short.deleted_at = Some(Utc::now());
-        let sut = make_service(vec![short], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![short], vec!["unused-code"]);
 
         let actual = sut.resolve_redirect_decision("deleted-code").await.unwrap();
 
@@ -831,7 +748,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_redirect_decision_returns_not_found_for_missing_code() {
-        let sut = make_service(vec![], vec![], vec!["unused-code"]);
+        let sut = make_service(vec![], vec!["unused-code"]);
 
         let actual = sut.resolve_redirect_decision("missing-code").await.unwrap();
 

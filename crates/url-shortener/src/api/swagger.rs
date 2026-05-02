@@ -5,16 +5,11 @@ use crate::{
     api::{
         error::ApiError,
         handlers::{
-            auth::{auth_handlers, login_request::LoginRequest},
             redirect,
             short_url::short_url_handlers,
             short_url::{
                 CreateShortUrlRequest, CreateShortUrlResponse, CreateVanityUrlRequest,
                 UpdateShortUrlRequest,
-            },
-            users::{
-                create_user_request::CreateUserRequest, handlers as user_handlers,
-                update_password_request::UpdatePasswordRequest, user_response::UserResponse,
             },
         },
         server,
@@ -52,9 +47,6 @@ impl Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        auth_handlers::login,
-        auth_handlers::logout,
-        auth_handlers::refresh,
         short_url_handlers::get_all,
         short_url_handlers::get_one_by_uuid,
         short_url_handlers::create_short_url,
@@ -62,11 +54,6 @@ impl Modify for SecurityAddon {
         short_url_handlers::update_one_by_uuid,
         short_url_handlers::delete_one_by_uuid,
         short_url_handlers::get_one_by_code,
-        user_handlers::get_all,
-        user_handlers::get_one_by_uuid,
-        user_handlers::delete_one_by_uuid,
-        user_handlers::update_password,
-        user_handlers::create_user,
         redirect::redirect,
         server::health_handler,
         server::ready_handler
@@ -75,8 +62,6 @@ impl Modify for SecurityAddon {
         schemas(
             ApiError,
             ValidationIssue,
-            LoginRequest,
-            LoginResponse,
             JwtTokens,
             StatusResponse,
             CreateShortUrlRequest,
@@ -84,9 +69,6 @@ impl Modify for SecurityAddon {
             UpdateShortUrlRequest,
             CreateShortUrlResponse,
             ShortUrl,
-            CreateUserRequest,
-            UpdatePasswordRequest,
-            UserResponse
         )
     ),
     modifiers(&SecurityAddon),

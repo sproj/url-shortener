@@ -11,8 +11,6 @@ use utoipa::ToSchema;
 
 use auth::auth_error::AuthError;
 
-use crate::domain::errors::UserError;
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
@@ -98,43 +96,6 @@ impl Display for ApiError {
 }
 
 impl std::error::Error for ApiError {}
-
-impl From<UserError> for ApiError {
-    fn from(err: UserError) -> Self {
-        let user_error_message = err.to_string();
-
-        match err {
-            UserError::AuthenticationError(e) => {
-                tracing::error!(%user_error_message, %e, "user authentication failed");
-                ApiError::from(e)
-            }
-            UserError::InvalidInput(issues) => {
-                tracing::error!(%user_error_message, "invalid create_user input");
-                ApiError::new(user_error_message)
-                    .kind(ApiErrorKind::ValidationError)
-                    .detail(json!({"invalid_user_input": issues }))
-            }
-            UserError::Storage(e) => {
-                tracing::error!(%e, "unexpected database error on user entity");
-                ApiError::new("internal database error").kind(ApiErrorKind::Internal)
-            }
-            UserError::UnprocessableInput(msg) => {
-                tracing::warn!("unprocessable input on user handler");
-                ApiError::new("unprocessable input")
-                    .kind(ApiErrorKind::UnprocessableInput)
-                    .detail(json!({"invalid_user_input": [{
-                        "field": "request_body",
-                        "code": "parse_failure",
-                        "message": msg
-                    }]}))
-            }
-            UserError::NotFound(id) => {
-                tracing::warn!(%id, "user not found");
-                ApiError::new(user_error_message).kind(ApiErrorKind::ResourceNotFound)
-            }
-        }
-    }
-}
 
 impl From<AuthError> for ApiError {
     fn from(err: AuthError) -> Self {

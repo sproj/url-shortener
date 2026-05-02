@@ -212,7 +212,7 @@ fn short_url_row_to_model(row: tokio_postgres::Row) -> Result<ShortUrl, Reposito
             .try_get("expires_at")
             .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
         user_id: row
-            .try_get::<_, Option<i64>>("user_id")
+            .try_get::<_, Option<Uuid>>("user_id")
             .map_err(|e| DatabaseError::Mapping(e.to_string()))?,
         created_at: row
             .try_get("created_at")
