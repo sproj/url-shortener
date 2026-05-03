@@ -1,10 +1,11 @@
 use reqwest::StatusCode;
 use serde_json::json;
 use url_shortener::api::handlers::short_url::CreateShortUrlResponse;
+use uuid::Uuid;
 
 use crate::common::{
     constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_SHORTEN_BY_UUID, API_PATH_VANITY},
-    helpers::create_user_and_login,
+    helpers::make_access_token,
     test_app::TestApp,
 };
 
@@ -50,7 +51,7 @@ async fn update_requires_auth() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_requires_auth").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let created =
         create_owned_vanity_url(&client, &sut, &token, "upd-auth-test", "http://example.com").await;
 
@@ -70,7 +71,7 @@ async fn update_forbidden_for_non_owner() {
     let client = reqwest::Client::new();
 
     // User A creates a vanity URL
-    let token_a = create_user_and_login(&client, &sut, "upd_owner_a").await;
+    let token_a = make_access_token(Uuid::now_v7(), &["user"]);
     let created = create_owned_vanity_url(
         &client,
         &sut,
@@ -81,7 +82,7 @@ async fn update_forbidden_for_non_owner() {
     .await;
 
     // User B attempts to update it
-    let token_b = create_user_and_login(&client, &sut, "upd_owner_b").await;
+    let token_b = make_access_token(Uuid::now_v7(), &["user"]);
     let res = client
         .patch(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str()))
         .bearer_auth(&token_b)
@@ -112,7 +113,7 @@ async fn update_forbidden_for_unowned_url() {
         .unwrap();
 
     // A logged-in user should still be forbidden from updating it — nobody owns it
-    let token = create_user_and_login(&client, &sut, "upd_unowned").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let res = client
         .patch(
             sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, anonymous_url.uuid).as_str()),
@@ -133,7 +134,7 @@ async fn update_long_url_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = no_redirect_client();
 
-    let token = create_user_and_login(&client, &sut, "upd_long_url").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let original_url = "http://example.com/original";
     let updated_url = "http://example.com/updated";
     let created =
@@ -188,7 +189,7 @@ async fn update_code_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = no_redirect_client();
 
-    let token = create_user_and_login(&client, &sut, "upd_code").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let long_url = "http://example.com/code-change-target";
     let old_code = "upd-code-old";
     let new_code = "upd-code-new";
@@ -235,7 +236,7 @@ async fn update_expires_at_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = no_redirect_client();
 
-    let token = create_user_and_login(&client, &sut, "upd_expires").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let created = create_owned_vanity_url(
         &client,
         &sut,
@@ -288,7 +289,7 @@ async fn clear_expires_at_makes_redirect_permanent() {
     let sut = TestApp::builder().build().await;
     let client = no_redirect_client();
 
-    let token = create_user_and_login(&client, &sut, "upd_clear_expiry").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let future_expiry = chrono::Utc::now() + chrono::Duration::days(7);
 
     // Create a vanity URL with a future expiry so the redirect starts as temporary
@@ -356,7 +357,7 @@ async fn update_with_empty_body_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_empty_body").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let created = create_owned_vanity_url(
         &client,
         &sut,
@@ -387,7 +388,7 @@ async fn update_with_invalid_long_url_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_bad_long_url").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let created = create_owned_vanity_url(
         &client,
         &sut,
@@ -418,7 +419,7 @@ async fn update_with_invalid_code_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_bad_code").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let created = create_owned_vanity_url(
         &client,
         &sut,
@@ -449,7 +450,7 @@ async fn update_with_past_expiry_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_past_expiry").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let created = create_owned_vanity_url(
         &client,
         &sut,
@@ -483,7 +484,7 @@ async fn update_code_conflict_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_conflict").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     // Create two vanity URLs with distinct codes
     create_owned_vanity_url(
         &client,
@@ -521,7 +522,7 @@ async fn update_nonexistent_uuid_returns_not_found() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "upd_not_found").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     // A v7 UUID that will not exist in the database
     let nonexistent = "01966c57-dead-7000-beef-000000000000";
 
