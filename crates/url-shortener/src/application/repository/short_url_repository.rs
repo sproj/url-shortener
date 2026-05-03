@@ -124,7 +124,7 @@ impl ShortUrlRepositoryTrait for PostgresShortUrlRepository {
             "INSERT INTO short_url (uuid, code, long_url, expires_at, user_id) \
         VALUES ($1, $2, $3, $4, $5) \
         RETURNING id, uuid, code, long_url, expires_at, created_at, updated_at, deleted_at, user_id",
-            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ, Type::INT8],
+            &[Type::UUID, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ, Type::UUID],
         )
         .await.map_err(DatabaseError::Query)?;
 

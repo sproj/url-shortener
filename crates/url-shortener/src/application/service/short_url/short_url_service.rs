@@ -66,12 +66,12 @@ impl ShortUrlService {
         }
 
         if let Some(owner_uuid) = short.user_id {
-            if owner_uuid != user_uuid {
-                return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
+            if owner_uuid == user_uuid {
+                return Ok(())
             }
         }
+        return Err(ShortUrlError::Unauthorized(AuthError::Forbidden));
 
-        Ok(())
     }
 }
 
