@@ -479,17 +479,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn add_generated_code_returns_not_found_for_unknown_user() {
-        let sut = make_service(vec![], vec!["generated-code"]);
-
-        let actual = sut
-            .add_generated_code(make_create_request(None, Some(Uuid::now_v7())))
-            .await;
-
-        assert!(matches!(actual.unwrap_err(), ShortUrlError::NotFound(..)));
-    }
-
-    #[tokio::test]
     async fn add_generated_code_retries_on_code_conflict() {
         let sut = ShortUrlService::new(
             Arc::new(RetryingShortUrlRepository::new(vec!["short_url_code_key"])),

@@ -1,6 +1,6 @@
 use crate::common::{
     constants::{API_PATH_SHORTEN, API_PATH_SHORTEN_BY_CODE, API_PATH_SHORTEN_BY_UUID},
-    helpers::{create_user_and_login, login_as_admin, pick_error_fields},
+    helpers::{make_access_token, pick_error_fields},
     test_app,
 };
 use axum::http::StatusCode;
@@ -52,12 +52,7 @@ async fn create_shorturl_as_logged_in_user_assigns_ownership() {
         "expires_at": null,
     });
 
-    let token = create_user_and_login(
-        &client,
-        &sut,
-        "create_shorturl_as_logged_in_user_assigns_ownership",
-    )
-    .await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let res = client
         .post(url)
@@ -167,7 +162,7 @@ async fn get_all_succeeds() {
 
     let expected_uuid = create.json::<CreateShortUrlResponse>().await.unwrap().uuid;
 
-    let token = login_as_admin(&client, &sut).await;
+    let token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
     let read_all = client
         .get(create_url)
         .bearer_auth(&token)
@@ -395,8 +390,7 @@ async fn delete_shorturl_by_id_succeeds_for_owner() {
         "expires_at": null,
     });
 
-    let token =
-        create_user_and_login(&client, &sut, "delete_shorturl_by_id_succeeds_for_owner").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let create = client
         .post(create_url)
@@ -451,8 +445,7 @@ async fn delete_shorturl_by_id_succeeds_for_admin() {
         "expires_at": null,
     });
 
-    let token =
-        create_user_and_login(&client, &sut, "delete_shorturl_by_id_succeeds_for_admin").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let create = client
         .post(create_url)
@@ -467,7 +460,7 @@ async fn delete_shorturl_by_id_succeeds_for_admin() {
     let created = create.json::<CreateShortUrlResponse>().await.unwrap();
     let url_with_id_path_param =
         sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
-    let admin_token = login_as_admin(&client, &sut).await;
+    let admin_token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
 
     let delete = client
         .delete(url_with_id_path_param)
@@ -521,12 +514,7 @@ async fn delete_shorturl_by_id_fails_for_non_owning_user() {
         "expires_at": null,
     });
 
-    let creator_token = create_user_and_login(
-        &client,
-        &sut,
-        "delete_shorturl_by_id_fails_for_non_owning_user",
-    )
-    .await;
+    let creator_token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let create = client
         .post(create_url)
@@ -542,7 +530,7 @@ async fn delete_shorturl_by_id_fails_for_non_owning_user() {
     let url_with_id_path_param =
         sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, created.uuid).as_str());
 
-    let evil_doer_token = create_user_and_login(&client, &sut, "i_love_deleting_others_urls").await;
+    let evil_doer_token = make_access_token(Uuid::now_v7(), &["user"]);
     let delete = client
         .delete(url_with_id_path_param)
         .bearer_auth(&evil_doer_token)
@@ -558,7 +546,7 @@ async fn get_shorturl_by_nosuch_id_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = login_as_admin(&client, &sut).await;
+    let token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
     let no_such_id = Uuid::nil();
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, no_such_id).as_str());
 
@@ -575,7 +563,7 @@ async fn delete_shorturl_by_nosuch_id_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = login_as_admin(&client, &sut).await;
+    let token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
     let no_such_id = Uuid::nil();
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, no_such_id).as_str());
 
@@ -620,7 +608,7 @@ async fn get_shorturl_by_nosuch_code_returns_404() {
     let sut = test_app::TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = login_as_admin(&client, &sut).await;
+    let token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
     let no_such_code = "no-such-code-no-sir-not-here";
     let url = sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_CODE, no_such_code).as_str());
 

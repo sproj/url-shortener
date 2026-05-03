@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::common::{
     constants::{API_PATH_REDIRECT, API_PATH_SHORTEN, API_PATH_SHORTEN_BY_UUID},
-    helpers::login_as_admin,
+    helpers::make_access_token,
     test_app, test_redis,
 };
 
@@ -119,7 +119,7 @@ async fn expired_code_returns_410() {
     let db = sut.state.db_pool.get().await.unwrap();
     db.execute(
         "INSERT INTO short_url (uuid, code, long_url, expires_at, deleted_at, user_id) VALUES ($1, $2, $3, $4, $5, $6)",
-        &[&Uuid::now_v7(), &code, &"http://expired.me", &Some(Utc::now() - Duration::days(1)), &Option::<chrono::DateTime<Utc>>::None, &Option::<i64>::None],
+        &[&Uuid::now_v7(), &code, &"http://expired.me", &Some(Utc::now() - Duration::days(1)), &Option::<chrono::DateTime<Utc>>::None, &Option::<uuid::Uuid>::None],
     )
     .await
     .unwrap();
@@ -147,7 +147,7 @@ async fn deleted_code_returns_410() {
     assert_eq!(create.status(), StatusCode::CREATED);
     let short: CreateShortUrlResponse = create.json().await.unwrap();
 
-    let token = login_as_admin(&client, &sut).await;
+    let token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
     let delete = client
         .delete(sut.build_path(format!("{}/{}", API_PATH_SHORTEN_BY_UUID, short.uuid).as_str()))
         .bearer_auth(&token)
@@ -202,7 +202,7 @@ async fn deleting_short_url_invalidates_cached_redirect() {
         .await;
     let client = no_redirect_client();
 
-    let token = login_as_admin(&client, &sut).await;
+    let token = make_access_token(Uuid::now_v7(), &["user", "admin"]);
 
     let input = serde_json::json!({
         "long_url": "http://delete-invalidates-cache.me",

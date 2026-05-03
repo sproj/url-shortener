@@ -3,10 +3,11 @@ use serde_json::json;
 use url_shortener::{
     api::handlers::short_url::CreateShortUrlResponse, domain::models::short_url::ShortUrl,
 };
+use uuid::Uuid;
 
 use crate::common::{
     constants::{API_PATH_REDIRECT, API_PATH_SHORTEN_BY_UUID, API_PATH_VANITY},
-    helpers::create_user_and_login,
+    helpers::make_access_token,
     test_app::TestApp,
 };
 
@@ -17,7 +18,7 @@ async fn create_vanity_url_succeeds() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_create_succeeds").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let vanity_code = "my-custom-code";
 
     let res = client
@@ -47,7 +48,7 @@ async fn vanity_url_redirects() {
         .build()
         .unwrap();
 
-    let token = create_user_and_login(&client, &sut, "vanity_redirects").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let vanity_code = "redirect-me";
     let long_url = "http://example.com/destination";
 
@@ -101,7 +102,7 @@ async fn duplicate_vanity_code_is_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_duplicate_code").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let input = json!({
         "long_url": "http://example.com",
         "vanity_url": "duplicate-this",
@@ -133,7 +134,7 @@ async fn create_vanity_url_rejects_invalid_long_url() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_invalid_long_url").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let res = client
         .post(sut.build_path(API_PATH_VANITY))
@@ -155,7 +156,7 @@ async fn create_vanity_url_rejects_expired_expires_at() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_past_expiry").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let yesterday = chrono::Utc::now() - chrono::Duration::days(1);
 
     let res = client
@@ -178,7 +179,7 @@ async fn vanity_url_is_associated_with_creating_user() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_user_association").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let create = client
         .post(sut.build_path(API_PATH_VANITY))
@@ -216,7 +217,7 @@ async fn vanity_code_with_invalid_characters_is_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_invalid_chars").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let res = client
         .post(sut.build_path(API_PATH_VANITY))
@@ -243,7 +244,7 @@ async fn vanity_code_exceeding_max_length_is_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_too_long_code").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
     let long_code = "a".repeat(65);
 
     let res = client
@@ -271,7 +272,7 @@ async fn empty_vanity_code_is_rejected() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
-    let token = create_user_and_login(&client, &sut, "vanity_empty_code").await;
+    let token = make_access_token(Uuid::now_v7(), &["user"]);
 
     let res = client
         .post(sut.build_path(API_PATH_VANITY))
