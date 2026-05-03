@@ -6,4 +6,3 @@ pub use short_url_repository_trait::ShortUrlRepositoryTrait;
 pub use short_url_repository_trait::mocks::{
     InMemoryMockShortUrlRepository, RetryingShortUrlRepository,
 };
-
