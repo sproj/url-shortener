@@ -5,7 +5,7 @@ use crate::application::{config::RabbitMqConfig, startup_error::StartupError};
 
 #[instrument(skip_all)]
 pub async fn connect(config: &RabbitMqConfig) -> Result<Channel, StartupError> {
-    let url = config.amqp_url();
+    let url = config.amqp_url()?;
     match Connection::connect(&url, ConnectionProperties::default()).await {
         Ok(conn) => match conn.create_channel().await {
             Ok(channel) => {
