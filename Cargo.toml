@@ -40,3 +40,4 @@ url = "2.5.8"
 uuid = { version = "1.21.0", features = ["v7", "serde"] }
 redis = { version = "1.0.5", features = ["tokio-comp"] }
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "use_pem"] }
+openssl = { version = "0.10", features = ["vendored"] }
