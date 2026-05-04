@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: url-shortener
+  labels:
+    app: url-shortener
+    component: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: url-shortener
+      component: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: url-shortener
+        component: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secrets
+                  key: username
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secrets
+                  key: password
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: "/"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
