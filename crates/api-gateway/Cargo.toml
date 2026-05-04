@@ -34,6 +34,7 @@ jsonwebtoken.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 axum-prometheus.workspace = true
+openssl.workspace = true
 
 [dev-dependencies]
 reqwest = { version = "0.13.1", features = ["json"] }
