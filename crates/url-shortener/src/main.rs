@@ -1,3 +1,5 @@
+use lapin::options::ExchangeDeclareOptions;
+use lapin::types::FieldTable;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, trace as sdktrace};
@@ -59,6 +61,15 @@ async fn run() -> Result<(), StartupError> {
     let mut builder = App::builder(cfg.clone(), db_pool).with_redis(redis);
     if let Some(ref rmq_cfg) = cfg.rabbitmq {
         let channel = rabbitmq_connect::connect(rmq_cfg).await?;
+        channel
+            .exchange_declare(
+                rmq_cfg.rabbitmq_exchange.as_str().into(),
+                lapin::ExchangeKind::Direct,
+                ExchangeDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await
+            .map_err(|e| StartupError::RabbitMqConnection(e.to_string()))?;
         builder = builder.with_rabbitmq(channel);
     }
     builder.build().await?.start().await

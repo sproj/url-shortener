@@ -50,11 +50,21 @@ pub struct RabbitMqConfig {
 }
 
 impl RabbitMqConfig {
-    pub fn amqp_url(&self) -> String {
-        format!(
-            "amqp://{}:{}@{}:{}/",
-            self.rabbitmq_user, self.rabbitmq_password, self.rabbitmq_host, self.rabbitmq_port
+    pub fn amqp_url(&self) -> Result<String, StartupError> {
+        let mut rabbitmq_url = url::Url::parse(
+            format!("amqp://{}:{}/%2F", self.rabbitmq_host, self.rabbitmq_port).as_mut_str(),
         )
+        .map_err(|_e| {
+            StartupError::Config("Failed to parse url from rabbitmq configuration".to_string())
+        })?;
+        rabbitmq_url
+            .set_username(&self.rabbitmq_user)
+            .map_err(|_e| StartupError::Config("Failed to set amqp user".to_string()))?;
+        rabbitmq_url
+            .set_password(Some(&self.rabbitmq_password))
+            .map_err(|_e| StartupError::Config("Failed to set amqp password".to_string()))?;
+
+        Ok(rabbitmq_url.to_string())
     }
 }
 
