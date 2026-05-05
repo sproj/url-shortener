@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 auth = { path = "../auth" }
 common = { path = "../common" }
-axum.workspace = true
 base64-url = "3.0.2"
+axum.workspace = true
 chrono.workspace = true
 deadpool-postgres.workspace = true
 deadpool-redis.workspace = true
@@ -35,7 +35,7 @@ rand = "0.10.0"
 axum-extra.workspace = true
 metrics.workspace = true
 axum-prometheus.workspace = true
-lapin = "4.6.0"
+lapin.workspace = true
 jsonwebtoken.workspace = true
 openssl.workspace = true
 
