@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 auth = { path = "../auth" }
+common = { path = "../common" }
 axum.workspace = true
 base64-url = "3.0.2"
 chrono.workspace = true

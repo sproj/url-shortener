@@ -795,9 +795,11 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "deadpool-postgres",
  "deadpool-redis",
  "redis",
+ "serde",
  "serde_json",
  "thiserror",
 ]
@@ -5138,6 +5140,7 @@ dependencies = [
  "axum-prometheus",
  "base64-url",
  "chrono",
+ "common",
  "deadpool-postgres",
  "deadpool-redis",
  "dotenvy",

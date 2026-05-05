@@ -10,15 +10,10 @@ use tracing::instrument;
 
 use crate::{
     api::error::ApiError,
-    application::{
-        service::{
-            analytics::analytics_publisher_trait::{RedirectEvent, RedirectType},
-            short_url::short_url_service::RedirectDecision,
-        },
-        state::SharedState,
-    },
+    application::{service::short_url::short_url_service::RedirectDecision, state::SharedState},
     domain::errors::ShortUrlError,
 };
+use common::events::redirect_event::{RedirectEvent, RedirectType};
 
 #[utoipa::path(
     get,

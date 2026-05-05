@@ -2,11 +2,10 @@ use lapin::{BasicProperties, Channel, options::BasicPublishOptions, types::Short
 use tracing::instrument;
 
 use crate::{
-    application::service::analytics::analytics_publisher_trait::{
-        AnalyticsPublisherTrait, RedirectEvent,
-    },
+    application::service::analytics::analytics_publisher_trait::AnalyticsPublisherTrait,
     infrastructure::messaging::messaging_error::MessagingError,
 };
+use common::events::redirect_event::RedirectEvent;
 
 pub struct RabbitMqPublisher {
     channel: Channel,
