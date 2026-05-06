@@ -44,14 +44,24 @@ pub async fn redirect(
         RedirectDecision::Gone => Ok(StatusCode::GONE.into_response()),
         RedirectDecision::NotFound => Err(ApiError::from(ShortUrlError::NotFound(code))),
         RedirectDecision::Permanent { long_url } => {
-            emit_analytics(&state, code.clone(), RedirectType::Permanent);
+            emit_analytics(
+                &state,
+                code.clone(),
+                long_url.clone(),
+                RedirectType::Permanent,
+            );
             match method {
                 Method::GET => redirect_response(StatusCode::MOVED_PERMANENTLY, &long_url),
                 _ => redirect_response(StatusCode::PERMANENT_REDIRECT, &long_url),
             }
         }
         RedirectDecision::Temporary { long_url } => {
-            emit_analytics(&state, code.clone(), RedirectType::Temporary);
+            emit_analytics(
+                &state,
+                code.clone(),
+                long_url.clone(),
+                RedirectType::Temporary,
+            );
             match method {
                 Method::GET => redirect_response(StatusCode::FOUND, &long_url),
                 _ => redirect_response(StatusCode::TEMPORARY_REDIRECT, &long_url),
@@ -60,10 +70,16 @@ pub async fn redirect(
     }
 }
 
-fn emit_analytics(state: &SharedState, code: String, redirect_type: RedirectType) {
+fn emit_analytics(
+    state: &SharedState,
+    code: String,
+    long_url: String,
+    redirect_type: RedirectType,
+) {
     let publisher = Arc::clone(&state.analytics_publisher);
     let event = RedirectEvent {
         code,
+        long_url,
         timestamp: Utc::now(),
         redirect_type,
     };
