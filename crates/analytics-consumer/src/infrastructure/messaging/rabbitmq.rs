@@ -1,12 +1,8 @@
 use common::events::redirect_event::RedirectEvent;
-use deadpool_postgres::Pool;
 use futures_lite::stream::StreamExt;
 use lapin::{
     Channel, Consumer,
-    options::{
-        BasicAckOptions, BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions,
-        QueueDeclareOptions,
-    },
+    options::{BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions},
     types::FieldTable,
 };
 use tokio::sync::Mutex;

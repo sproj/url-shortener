@@ -1,4 +1,3 @@
-use chrono::Utc;
 use common::{
     events::redirect_event::{RedirectEvent, RedirectType},
     repository_error::RepositoryError,
