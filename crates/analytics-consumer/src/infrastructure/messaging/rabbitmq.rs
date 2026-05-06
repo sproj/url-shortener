@@ -1,24 +1,31 @@
+use common::events::redirect_event::RedirectEvent;
 use deadpool_postgres::Pool;
 use futures_lite::stream::StreamExt;
 use lapin::{
-    Channel,
+    Channel, Consumer,
     options::{
         BasicAckOptions, BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions,
         QueueDeclareOptions,
     },
     types::FieldTable,
 };
+use tokio::sync::Mutex;
 use tracing::instrument;
 
 use crate::{
-    application::service::analytics_consumer_trait::AnalyticsConsumerTrait,
-    infrastructure::messaging::messaging_error::MessagingError,
+    application::service::{
+        ack_handle_trait::AckHandle, analytics_consumer_trait::AnalyticsConsumerTrait,
+    },
+    infrastructure::messaging::{
+        messaging_error::MessagingError, rabbitmq_ack_handle::RabbitMqAckHandle,
+    },
 };
 
 pub struct RabbitMqConsumer {
     channel: Channel,
     exchange_name: String,
     queue_name: String,
+    consumer: Mutex<Option<Consumer>>,
 }
 
 impl RabbitMqConsumer {
@@ -27,14 +34,11 @@ impl RabbitMqConsumer {
             channel,
             exchange_name,
             queue_name,
+            consumer: Mutex::new(None),
         }
     }
-}
 
-#[async_trait::async_trait]
-impl AnalyticsConsumerTrait for RabbitMqConsumer {
-    #[instrument(skip(self))]
-    async fn consume(&self, routing_key: &str) -> Result<(), MessagingError> {
+    pub async fn setup(self, routing_key: &str) -> Result<Self, MessagingError> {
         self.channel
             .exchange_declare(
                 self.exchange_name.clone().into(),
@@ -64,7 +68,7 @@ impl AnalyticsConsumerTrait for RabbitMqConsumer {
             .await
             .expect("failed to bind queue");
 
-        let mut consumer = self
+        let consumer = self
             .channel
             .basic_consume(
                 self.queue_name.clone().into(),
@@ -75,18 +79,36 @@ impl AnalyticsConsumerTrait for RabbitMqConsumer {
             .await
             .expect("failed to create consumer");
 
-        while let Some(delivery) = consumer.next().await {
-            match delivery {
-                Ok(d) => {
+        Ok(Self {
+            channel: self.channel,
+            exchange_name: self.exchange_name,
+            queue_name: self.queue_name,
+            consumer: Mutex::new(Some(consumer)),
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl AnalyticsConsumerTrait for RabbitMqConsumer {
+    #[instrument(skip(self))]
+    async fn next(&self) -> Result<(RedirectEvent, Box<dyn AckHandle>), MessagingError> {
+        let mut guard = self.consumer.lock().await;
+        let consumer = guard.as_mut().ok_or(MessagingError::NoConsumer)?;
+        if let Some(delivery_result) = consumer.next().await {
+            match delivery_result {
+                Ok(delivery) => {
                     tracing::debug!("received message");
-                    d.ack(BasicAckOptions::default());
+                    let event = serde_json::from_slice::<RedirectEvent>(&delivery.data)
+                        .map_err(|e| MessagingError::Deserialization(e.to_string()))?;
+                    Ok((event, Box::new(RabbitMqAckHandle { delivery })))
                 }
                 Err(e) => {
                     tracing::error!(%e, "delivery error encountered");
+                    Err(MessagingError::RabbitMq(e))
                 }
             }
+        } else {
+            Err(MessagingError::EmptyMessage)
         }
-
-        Ok(())
     }
 }

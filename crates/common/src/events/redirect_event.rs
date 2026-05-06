@@ -11,6 +11,7 @@ pub enum RedirectType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedirectEvent {
     pub code: String,
+    pub long_url: String,
     pub timestamp: DateTime<Utc>,
     pub redirect_type: RedirectType,
 }

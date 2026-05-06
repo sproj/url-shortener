@@ -8,6 +8,10 @@ pub enum MessagingError {
     RabbitMq(#[from] lapin::Error),
     #[error("deserialization error: {0}")]
     Deserialization(String),
+    #[error("consumer not set up")]
+    NoConsumer,
+    #[error("consumer received empty message")]
+    EmptyMessage,
 }
 
 impl From<serde_json::Error> for MessagingError {
