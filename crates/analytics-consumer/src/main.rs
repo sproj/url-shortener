@@ -45,7 +45,10 @@ async fn main() -> Result<(), StartupError> {
 
     let app = build().await?;
     let consumer = app.state().analytics.clone();
-    tokio::try_join!(consumer.run(), app.start())?;
+    tokio::select! {
+        r = consumer.run() => r?,
+        r = app.start() => r?
+    }
 
     provider
         .shutdown()
