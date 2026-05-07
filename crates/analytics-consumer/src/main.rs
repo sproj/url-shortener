@@ -1,7 +1,3 @@
-mod api;
-mod application;
-mod infrastructure;
-
 use lapin::options::ExchangeDeclareOptions;
 use lapin::types::FieldTable;
 use opentelemetry::trace::TracerProvider as _;
@@ -13,11 +9,11 @@ use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::application::app::App;
-use crate::application::config;
-use crate::application::startup_error::StartupError;
-use crate::infrastructure::database::postgres::Database;
-use crate::infrastructure::messaging;
+use analytics_consumer::application::app::App;
+use analytics_consumer::application::config;
+use analytics_consumer::application::startup_error::StartupError;
+use analytics_consumer::infrastructure::database::postgres::Database;
+use analytics_consumer::infrastructure::messaging;
 
 #[tokio::main]
 async fn main() -> Result<(), StartupError> {
