@@ -13,9 +13,6 @@ COPY crates/url-shortener/Cargo.toml ./crates/url-shortener/Cargo.toml
 COPY crates/auth/Cargo.toml ./crates/auth/Cargo.toml
 COPY crates/auth/src ./crates/auth/src
 
-COPY crates/api-gateway/Cargo.toml ./crates/api-gateway/Cargo.toml
-COPY crates/api-gateway/src ./crates/api-gateway/src
-
 COPY crates/common/Cargo.toml ./crates/common/Cargo.toml
 COPY crates/common/src ./crates/common/src
 
