@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-consumer-config
+  namespace: url-shortener
+data:
+  SERVICE_HOST: "0.0.0.0"
+  SERVICE_PORT: "8081"
+  POSTGRES_HOST: "postgres-service.databases.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_CONNECTION_POOL: "5"
+  RABBITMQ_HOST: "rabbitmq-service"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_EXCHANGE: "url-shortener"
+  REDIRECT_EVENT_ROUTING_KEY: "redirect_events"
+  ANALYTICS_QUEUE_NAME: "analytics_redirect_events"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger.observability.svc.cluster.local:4317"
+  # log level
+  RUST_LOG: "info,opentelemetry_sdk=off"

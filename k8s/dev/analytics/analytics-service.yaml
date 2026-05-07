@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-consumer-service
+  namespace: url-shortener
+  labels:
+    app: analytics-consumer
+spec:
+  selector:
+    app: analytics
+    component: consumer
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
