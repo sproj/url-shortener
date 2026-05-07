@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y musl-tools perl make && rm -rf /var/lib
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
+
 COPY crates/url-shortener/src ./crates/url-shortener/src
 COPY crates/url-shortener/Cargo.toml ./crates/url-shortener/Cargo.toml
 
@@ -15,6 +16,13 @@ COPY crates/auth/src ./crates/auth/src
 
 COPY crates/common/Cargo.toml ./crates/common/Cargo.toml
 COPY crates/common/src ./crates/common/src
+
+# stub of non-dependency crates (and a main) or cargo gets too sad to build
+COPY crates/api-gateway/Cargo.toml ./crates/api-gateway/Cargo.toml
+RUN mkdir -p ./crates/api-gateway/src && echo 'fn main() {}' > ./crates/api-gateway/src/main.rs
+
+COPY crates/analytics-consumer/Cargo.toml ./crates/analytics-consumer/Cargo.toml
+RUN mkdir -p ./crates/analytics-consumer/src && echo 'fn main() {}' > ./crates/analytics-consumer/src/main.rs
 
 RUN cargo build --release --target x86_64-unknown-linux-musl -p url-shortener
 
