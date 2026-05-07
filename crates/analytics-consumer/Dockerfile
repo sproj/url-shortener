@@ -11,7 +11,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates/common/Cargo.toml ./crates/common/Cargo.toml
 COPY crates/common/src ./crates/common/src
 
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl -p analytics-consumer
 
 FROM debian:bookworm-slim AS release
 
