@@ -1,9 +1,12 @@
-name: Docker Image CI
+name: Publish api-gateway
 
 on:
   push:
     branches: ["main"]
     tags: ["v*"]
+    paths:
+      - "crates/api-gateway/**"
+      - "crates/common/**"
 
 jobs:
   build:
@@ -19,7 +22,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/sproj/url-shortener
+          images: ghcr.io/sproj/api-gateway
 
       - name: login to ghcr
         uses: docker/login-action@v3
@@ -34,7 +37,7 @@ jobs:
       - name: build and push
         uses: docker/build-push-action@v5.0.0
         with:
-          context: .
+          context: crates/api-gateway
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
