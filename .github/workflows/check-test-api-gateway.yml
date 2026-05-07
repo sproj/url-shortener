@@ -5,7 +5,11 @@ on:
     branches:
       - "main"
     paths:
-      - "crates/api-gateway/**"
+      - "crates/api-gateway/src/**"
+      - "crates/api-gateway/test/**"
+      - "crates/api-gateway/Cargo.toml"
+      - "crates/api-gateway/Cargo.lock"
+      - "!crates/api-gateway/Dockerfile"
       - "crates/common/**"
 
 env:

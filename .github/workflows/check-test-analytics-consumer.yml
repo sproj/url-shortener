@@ -5,7 +5,11 @@ on:
     branches:
       - "main"
     paths:
-      - "crates/analytics-consumer/**"
+      - "crates/analytics-consumer/src/**"
+      - "crates/analytics-consumer/test/**"
+      - "crates/analytics-consumer/Cargo.toml"
+      - "crates/analytics-consumer/Cargo.lock"
+      - "!crates/analytics-consumer/Dockerfile"
       - "crates/common/**"
 
 env:
