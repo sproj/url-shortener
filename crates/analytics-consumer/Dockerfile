@@ -19,7 +19,7 @@ COPY crates/url-shortener/Cargo.toml ./crates/url-shortener/Cargo.toml
 RUN mkdir -p ./crates/url-shortener/src && echo 'fn main() {}' > ./crates/url-shortener/src/main.rs
 
 COPY crates/api-gateway/Cargo.toml ./crates/api-gateway/Cargo.toml
-RUN mkdir -p ./crates/url-shortener/src && echo 'fn main() {}' > ./crates/url-shortener/src/main.rs
+RUN mkdir -p ./crates/api-gateway/src && echo 'fn main() {}' > ./crates/api-gateway/src/main.rs
 
 RUN cargo build --release --target x86_64-unknown-linux-musl -p analytics-consumer
 
