@@ -15,6 +15,9 @@ COPY crates/analytics-consumer/Cargo.toml ./crates/analytics-consumer/Cargo.toml
 COPY crates/analytics-consumer/src ./crates/analytics-consumer/src
 
 # stub of non-dependency crates (and a main) or cargo gets too sad to build
+COPY crates/auth/Cargo.toml ./crates/auth/Cargo.toml
+RUN mkdir -p ./crates/auth/src && touch ./crates/auth/src/lib.rs
+
 COPY crates/url-shortener/Cargo.toml ./crates/url-shortener/Cargo.toml
 RUN mkdir -p ./crates/url-shortener/src && echo 'fn main() {}' > ./crates/url-shortener/src/main.rs
 
