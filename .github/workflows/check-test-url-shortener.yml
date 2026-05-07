@@ -5,7 +5,12 @@ on:
     branches:
       - "main"
     paths:
-      - "crates/url-shortener/**"
+      - "crates/url-shortener/src/**"
+      - "crates/url-shortener/test/**"
+      - "crates/url-shortener/Cargo.toml"
+      - "crates/url-shortener/Cargo.lock"
+      - "!crates/url-shortener/Dockerfile"
+      - "crates/auth/**"
       - "crates/common/**"
 
 env:
