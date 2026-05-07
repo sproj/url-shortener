@@ -22,7 +22,14 @@ services:
       - 5540:5540
     depends_on:
       - redis
-  
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASSWORD: guest  
   jaeger:
     image: jaegertracing/jaeger:2.17.0
     ports:
