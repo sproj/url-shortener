@@ -47,7 +47,10 @@ impl RabbitMqConsumer {
         self.channel
             .queue_declare(
                 self.queue_name.clone().into(),
-                QueueDeclareOptions::default(),
+                QueueDeclareOptions {
+                    durable: true,
+                    ..Default::default()
+                },
                 FieldTable::default(),
             )
             .await
