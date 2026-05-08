@@ -128,6 +128,16 @@ impl From<UserError> for ApiError {
                         "message": msg
                     }]}))
             }
+            UserError::Conflict(msg) => {
+                tracing::warn!("duplicate user detected");
+                ApiError::new(&msg).kind(ApiErrorKind::Conflict).detail(
+                    json!({"duplicate_user_input": [{
+                        "field": "request_body",
+                        "code": "duplicate",
+                        "message": msg
+                    }]}),
+                )
+            }
             UserError::NotFound(id) => {
                 tracing::warn!(%id, "user not found");
                 ApiError::new(user_error_message).kind(ApiErrorKind::ResourceNotFound)

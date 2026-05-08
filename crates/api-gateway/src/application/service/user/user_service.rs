@@ -75,7 +75,7 @@ impl UserServiceTrait for UsersService {
             Ok(created) => Ok(created),
             Err(e) => {
                 tracing::error!(%e, "create user failed");
-                Err(UserError::Storage(e))
+                Err(UserError::from(e))
             }
         }
     }
@@ -100,7 +100,7 @@ impl UserServiceTrait for UsersService {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::{errors::RepositoryError, traits::InMemoryMockUsersRepository};
+    use crate::domain::traits::InMemoryMockUsersRepository;
 
     use super::*;
 
@@ -151,10 +151,7 @@ mod tests {
 
         let err = actual.unwrap_err();
 
-        assert!(matches!(
-            err,
-            UserError::Storage(RepositoryError::Conflict { .. })
-        ))
+        assert!(matches!(err, UserError::Conflict(_)))
     }
 
     #[tokio::test]

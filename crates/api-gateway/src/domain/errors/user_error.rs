@@ -16,10 +16,21 @@ pub enum UserError {
     UnprocessableInput(String),
     #[error("user not found: {0}")]
     NotFound(String),
+    #[error("duplicate user creation: {0}")]
+    Conflict(String),
 }
 
 impl From<RepositoryError> for UserError {
     fn from(err: RepositoryError) -> Self {
-        Self::Storage(err)
+        match err {
+            RepositoryError::Conflict { .. } => {
+                tracing::warn!(%err, "attempted to create a duplicate user");
+                Self::Conflict(err.to_string())
+            }
+            _ => {
+                tracing::error!(%err, "create user failed");
+                Self::Storage(err)
+            }
+        }
     }
 }
