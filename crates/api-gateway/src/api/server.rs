@@ -145,7 +145,7 @@ mod tests {
     use jsonwebtoken::{DecodingKey, EncodingKey};
 
     use super::*;
-    use crate::application::config::{AppConfig, Config, DbConfig, JwtConfig, RedisConfig};
+    use crate::application::config::{Config, DbConfig, JwtConfig, RedisConfig, ServiceConfig};
     use auth::jwt::JwtKeys;
     use std::net::TcpListener as StdTcpListener;
 
@@ -155,9 +155,9 @@ mod tests {
         let port = occupied.local_addr().unwrap().port();
 
         let config = Config {
-            app: AppConfig {
-                service_host: "127.0.0.1".to_string(),
-                service_port: port,
+            app: ServiceConfig {
+                host: "127.0.0.1".to_string(),
+                port,
             },
             db: DbConfig {
                 postgres_user: "admin".to_string(),

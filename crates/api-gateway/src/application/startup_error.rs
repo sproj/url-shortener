@@ -1,3 +1,4 @@
+use common::config::ConfigError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,4 +17,10 @@ pub enum StartupError {
     RedisConnection(String),
     #[error("tracing subscriber init error: {0}")]
     TracingSubscriber(String),
+}
+
+impl From<ConfigError> for StartupError {
+    fn from(e: ConfigError) -> Self {
+        StartupError::Config(e.to_string())
+    }
 }

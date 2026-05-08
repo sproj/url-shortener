@@ -28,8 +28,8 @@ impl App {
     pub async fn start(self) -> Result<(), StartupError> {
         tracing::info!(
             "Starting server on: {}:{}",
-            self.config.app.service_host,
-            self.config.app.service_port
+            self.config.app.host,
+            self.config.app.port
         );
 
         server::start(self.config, self.state).await
@@ -57,7 +57,7 @@ impl AppBuilder {
             RabbitMqConsumer::new(
                 self.rabbitmq,
                 cfg.rabbitmq.rabbitmq_exchange.clone(),
-                cfg.rabbitmq.analytics_queue_name.clone(),
+                cfg.analytics_queue_name.clone(),
             )
             .setup(&cfg.rabbitmq.redirect_event_routing_key.clone())
             .await

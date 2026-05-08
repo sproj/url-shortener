@@ -1,7 +1,8 @@
 use lapin::{Channel, Connection, ConnectionProperties};
 use tracing::instrument;
 
-use crate::application::{config::RabbitMqConfig, startup_error::StartupError};
+use crate::application::startup_error::StartupError;
+use common::config::RabbitMqConfig;
 
 #[instrument(skip_all)]
 pub async fn connect(config: &RabbitMqConfig) -> Result<Channel, StartupError> {

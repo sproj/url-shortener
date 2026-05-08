@@ -18,7 +18,7 @@ async fn ready_succeeds_on_db_connectable() {
 async fn ready_fails_on_no_database() {
     let mut cfg = url_shortener::application::config::load().unwrap();
     cfg.db.postgres_port = 1;
-    cfg.app.service_port = 0;
+    cfg.app.service.port = 0;
     let db = test_db::get_or_create().await;
 
     let sut = test_app::TestApp::builder()
@@ -43,7 +43,7 @@ async fn ready_fails_on_invalid_db_config() {
     // cfg.db.postgres_db = db.postgres_db.clone();
     // cfg.db.postgres_user = db.postgres_user.clone();
     cfg.db.postgres_password = "invalid".into();
-    cfg.app.service_port = 0;
+    cfg.app.service.port = 0;
 
     let sut = test_app::TestApp::builder()
         .with_db(db)

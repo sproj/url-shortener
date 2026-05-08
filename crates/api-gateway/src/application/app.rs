@@ -40,8 +40,8 @@ impl App {
     pub async fn start(self) -> Result<(), StartupError> {
         tracing::info!(
             "Starting api-gateway on: {}:{}",
-            self.config.app.service_host,
-            self.config.app.service_port
+            self.config.app.host,
+            self.config.app.port
         );
         server::start(self.config, self.state).await
     }
