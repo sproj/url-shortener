@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::common::{
     constants::API_PATH_USERS,
-    helpers::{create_user_and_login, login_as_admin},
+    helpers::{create_admin_user, create_user_and_login, login_as_admin},
     test_app::TestApp,
 };
 
@@ -113,6 +113,7 @@ async fn get_all_users_succeeds() {
     assert_eq!(create_res.status(), StatusCode::CREATED);
     let user = create_res.json::<UserResponse>().await.unwrap();
 
+    create_admin_user(&sut).await.unwrap();
     let token = login_as_admin(&client, &sut).await;
 
     let res = client
@@ -236,6 +237,7 @@ async fn get_user_by_uuid_404() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
+    create_admin_user(&sut).await.unwrap();
     let token = login_as_admin(&client, &sut).await;
 
     let res = client
@@ -364,6 +366,7 @@ async fn delete_user_by_uuid_404() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
+    create_admin_user(&sut).await.unwrap();
     let token = login_as_admin(&client, &sut).await;
 
     let res = client
@@ -522,6 +525,7 @@ async fn update_password_404() {
     let sut = TestApp::builder().build().await;
     let client = reqwest::Client::new();
 
+    create_admin_user(&sut).await.unwrap();
     let token = login_as_admin(&client, &sut).await;
 
     let res = client
