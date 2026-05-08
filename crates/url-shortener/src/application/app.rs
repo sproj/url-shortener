@@ -41,8 +41,8 @@ impl App {
     pub async fn start(self) -> Result<(), StartupError> {
         tracing::info!(
             "Starting server on: {}:{}",
-            self.config.app.service_host,
-            self.config.app.service_port
+            self.config.app.service.host,
+            self.config.app.service.port
         );
         server::start(self.config, self.state).await
     }

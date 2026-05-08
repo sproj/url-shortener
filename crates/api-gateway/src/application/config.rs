@@ -1,39 +1,15 @@
 use crate::application::startup_error::StartupError;
 use auth::jwt::JwtKeys;
+pub use common::config::{DbConfig, RedisConfig, ServiceConfig};
+use common::config::{env_get, env_get_or, env_parse};
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    // Rest API configuration
-    pub app: AppConfig,
-    // PostgreSQL configuration
+    pub app: ServiceConfig,
     pub db: DbConfig,
-    // Redis configuration.
     pub redis: RedisConfig,
-    // JWT configuration
     pub jwt: JwtConfig,
-}
-
-#[derive(Clone, Debug)]
-pub struct AppConfig {
-    pub service_host: String,
-    pub service_port: u16,
-}
-
-#[derive(Clone, Debug)]
-pub struct DbConfig {
-    pub postgres_user: String,
-    pub postgres_password: String,
-    pub postgres_host: String,
-    pub postgres_port: u16,
-    pub postgres_db: String,
-    pub postgres_connection_pool: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct RedisConfig {
-    pub redis_host: String,
-    pub redis_port: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -49,11 +25,8 @@ pub struct JwtConfig {
 impl Config {
     pub fn service_socket_address(&self) -> Result<SocketAddr, StartupError> {
         use std::str::FromStr;
-        SocketAddr::from_str(&format!(
-            "{}:{}",
-            self.app.service_host, self.app.service_port
-        ))
-        .map_err(|e| StartupError::Server(e.to_string()))
+        SocketAddr::from_str(&format!("{}:{}", self.app.host, self.app.port))
+            .map_err(|e| StartupError::Server(e.to_string()))
     }
 
     pub fn redis_url(&self) -> String {
@@ -71,7 +44,6 @@ pub fn load() -> Result<Config, StartupError> {
         ".env"
     };
 
-    // Try to load environment variables from file.
     match dotenvy::from_filename(env_file) {
         Ok(path) => tracing::info!(%env_file, path = %path.display(), "config loaded from file"),
         Err(err) if err.not_found() => {
@@ -85,9 +57,9 @@ pub fn load() -> Result<Config, StartupError> {
     let jwt_secret = env_get("JWT_SECRET")?;
 
     let cfg = Config {
-        app: AppConfig {
-            service_host: env_get("SERVICE_HOST")?,
-            service_port: env_parse("SERVICE_PORT")?,
+        app: ServiceConfig {
+            host: env_get("SERVICE_HOST")?,
+            port: env_parse("SERVICE_PORT")?,
         },
         db: DbConfig {
             postgres_user: env_get("POSTGRES_USER")?,
@@ -112,33 +84,6 @@ pub fn load() -> Result<Config, StartupError> {
     };
 
     Ok(cfg)
-}
-
-fn env_get(key: &str) -> Result<String, StartupError> {
-    match std::env::var(key) {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            let msg = format!("{} {}", key, e);
-            Err(StartupError::Config(msg))
-        }
-    }
-}
-
-fn env_get_or(key: &str, default: &str) -> String {
-    if let Ok(v) = std::env::var(key) {
-        return v;
-    }
-    default.to_owned()
-}
-
-fn env_parse<T>(key: &str) -> Result<T, StartupError>
-where
-    T: std::str::FromStr,
-    <T as std::str::FromStr>::Err: std::fmt::Display,
-{
-    env_get(key)?
-        .parse::<T>()
-        .map_err(|e| StartupError::Config(format!("Failed to parse {} : {}", key, e)))
 }
 
 #[cfg(test)]
@@ -179,9 +124,9 @@ mod tests {
     fn service_socket_address_returns_error_for_invalid_host() {
         let config = config_fixture();
         let invalid = Config {
-            app: AppConfig {
-                service_host: "bad host name with spaces".to_string(),
-                service_port: config.app.service_port,
+            app: ServiceConfig {
+                host: "bad host name with spaces".to_string(),
+                port: config.app.port,
             },
             ..config
         };
@@ -193,9 +138,9 @@ mod tests {
 
     fn config_fixture() -> Config {
         Config {
-            app: AppConfig {
-                service_host: "127.0.0.1".to_string(),
-                service_port: 0,
+            app: ServiceConfig {
+                host: "127.0.0.1".to_string(),
+                port: 0,
             },
             db: DbConfig {
                 postgres_user: "admin".to_string(),

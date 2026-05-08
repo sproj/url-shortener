@@ -135,7 +135,7 @@ impl TestAppBuilder {
 fn config_from_db(db: &SharedTestDb) -> Config {
     let mut config = url_shortener::application::config::load().unwrap();
     config.db = db.config.clone();
-    config.app.service_port = 0;
+    config.app.service.port = 0;
     config
 }
 

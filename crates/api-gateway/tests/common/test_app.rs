@@ -123,7 +123,7 @@ impl TestAppBuilder {
 fn config_from_db(db: &SharedTestDb) -> Config {
     let mut config = api_gateway::application::config::load().unwrap();
     config.db = db.config.clone();
-    config.app.service_port = 0;
+    config.app.port = 0;
     config
 }
 

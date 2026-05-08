@@ -1,71 +1,22 @@
 use crate::application::startup_error::StartupError;
 use auth::jwt::JwtKeys;
+pub use common::config::{DbConfig, RabbitMqConfig, RedisConfig, ServiceConfig};
+use common::config::{env_get, env_get_or, env_parse};
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    // Rest API configuration
     pub app: AppConfig,
-    // PostgreSQL configuration
     pub db: DbConfig,
-    // Redis configuration.
     pub redis: RedisConfig,
-    // JWT configuration
     pub jwt: JwtConfig,
-    // RabbitMQ configuration
     pub rabbitmq: Option<RabbitMqConfig>,
 }
 
 #[derive(Clone, Debug)]
 pub struct AppConfig {
-    pub service_host: String,
-    pub service_port: u16,
+    pub service: ServiceConfig,
     pub max_retries: u8,
-}
-
-#[derive(Clone, Debug)]
-pub struct DbConfig {
-    pub postgres_user: String,
-    pub postgres_password: String,
-    pub postgres_host: String,
-    pub postgres_port: u16,
-    pub postgres_db: String,
-    pub postgres_connection_pool: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct RedisConfig {
-    pub redis_host: String,
-    pub redis_port: u16,
-}
-
-#[derive(Clone, Debug)]
-pub struct RabbitMqConfig {
-    pub rabbitmq_host: String,
-    pub rabbitmq_port: u16,
-    pub rabbitmq_user: String,
-    pub rabbitmq_password: String,
-    pub rabbitmq_exchange: String,
-    pub redirect_event_routing_key: String,
-}
-
-impl RabbitMqConfig {
-    pub fn amqp_url(&self) -> Result<String, StartupError> {
-        let mut rabbitmq_url = url::Url::parse(
-            format!("amqp://{}:{}/%2F", self.rabbitmq_host, self.rabbitmq_port).as_mut_str(),
-        )
-        .map_err(|_e| {
-            StartupError::Config("Failed to parse url from rabbitmq configuration".to_string())
-        })?;
-        rabbitmq_url
-            .set_username(&self.rabbitmq_user)
-            .map_err(|_e| StartupError::Config("Failed to set amqp user".to_string()))?;
-        rabbitmq_url
-            .set_password(Some(&self.rabbitmq_password))
-            .map_err(|_e| StartupError::Config("Failed to set amqp password".to_string()))?;
-
-        Ok(rabbitmq_url.to_string())
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -83,7 +34,7 @@ impl Config {
         use std::str::FromStr;
         SocketAddr::from_str(&format!(
             "{}:{}",
-            self.app.service_host, self.app.service_port
+            self.app.service.host, self.app.service.port
         ))
         .map_err(|e| StartupError::Server(e.to_string()))
     }
@@ -103,7 +54,6 @@ pub fn load() -> Result<Config, StartupError> {
         ".env"
     };
 
-    // Try to load environment variables from file.
     match dotenvy::from_filename(env_file) {
         Ok(path) => tracing::info!(%env_file, path = %path.display(), "config loaded from file"),
         Err(err) if err.not_found() => {
@@ -118,8 +68,10 @@ pub fn load() -> Result<Config, StartupError> {
 
     let cfg = Config {
         app: AppConfig {
-            service_host: env_get("SERVICE_HOST")?,
-            service_port: env_parse("SERVICE_PORT")?,
+            service: ServiceConfig {
+                host: env_get("SERVICE_HOST")?,
+                port: env_parse("SERVICE_PORT")?,
+            },
             max_retries: env_parse("MAX_RETRIES")?,
         },
         db: DbConfig {
@@ -161,33 +113,6 @@ pub fn load() -> Result<Config, StartupError> {
     Ok(cfg)
 }
 
-fn env_get(key: &str) -> Result<String, StartupError> {
-    match std::env::var(key) {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            let msg = format!("{} {}", key, e);
-            Err(StartupError::Config(msg))
-        }
-    }
-}
-
-fn env_get_or(key: &str, default: &str) -> String {
-    if let Ok(v) = std::env::var(key) {
-        return v;
-    }
-    default.to_owned()
-}
-
-fn env_parse<T>(key: &str) -> Result<T, StartupError>
-where
-    T: std::str::FromStr,
-    <T as std::str::FromStr>::Err: std::fmt::Display,
-{
-    env_get(key)?
-        .parse::<T>()
-        .map_err(|e| StartupError::Config(format!("Failed to parse {} : {}", key, e)))
-}
-
 #[cfg(test)]
 mod tests {
     use auth::jwt::JwtKeys;
@@ -227,8 +152,10 @@ mod tests {
         let config = config_fixture();
         let invalid = Config {
             app: AppConfig {
-                service_host: "bad host name with spaces".to_string(),
-                service_port: config.app.service_port,
+                service: ServiceConfig {
+                    host: "bad host name with spaces".to_string(),
+                    port: config.app.service.port,
+                },
                 max_retries: 5,
             },
             ..config
@@ -242,8 +169,10 @@ mod tests {
     fn config_fixture() -> Config {
         Config {
             app: AppConfig {
-                service_host: "127.0.0.1".to_string(),
-                service_port: 0,
+                service: ServiceConfig {
+                    host: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 max_retries: 5,
             },
             db: DbConfig {

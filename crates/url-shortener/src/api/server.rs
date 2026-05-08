@@ -141,7 +141,9 @@ mod tests {
     use jsonwebtoken::{DecodingKey, EncodingKey};
 
     use super::*;
-    use crate::application::config::{AppConfig, Config, DbConfig, JwtConfig, RedisConfig};
+    use crate::application::config::{
+        AppConfig, Config, DbConfig, JwtConfig, RedisConfig, ServiceConfig,
+    };
     use auth::jwt::JwtKeys;
     use std::net::TcpListener as StdTcpListener;
 
@@ -152,8 +154,10 @@ mod tests {
 
         let config = Config {
             app: AppConfig {
-                service_host: "127.0.0.1".to_string(),
-                service_port: port,
+                service: ServiceConfig {
+                    host: "127.0.0.1".to_string(),
+                    port,
+                },
                 max_retries: 5,
             },
             db: DbConfig {
