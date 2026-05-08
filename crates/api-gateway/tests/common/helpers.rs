@@ -6,7 +6,13 @@ use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
-use api_gateway::{api::error::ApiError, application::security::claims::AccessClaims};
+use api_gateway::{
+    api::error::ApiError,
+    application::{
+        security::claims::AccessClaims, service::user::create_user_params::CreateUserParams,
+    },
+    domain::errors::UserError,
+};
 
 use crate::common::{
     constants::{API_PATH_LOGIN, API_PATH_USERS},
@@ -43,10 +49,33 @@ pub async fn create_user_and_login(
     body["access_token"].as_str().unwrap().to_string()
 }
 
+const TEST_ADMIN_USERNAME: &str = "admin";
+const TEST_ADMIN_PASSWORD: &str = "pass1234";
+const TEST_ADMIN_EMAIL: &str = "admin@admin.com";
+
+pub async fn create_admin_user(sut: &TestApp) -> Result<(), String> {
+    match sut
+        .state
+        .user_service
+        .add_user(CreateUserParams {
+            username: TEST_ADMIN_USERNAME.to_string(),
+            password: TEST_ADMIN_PASSWORD.to_string(),
+            email: TEST_ADMIN_EMAIL.to_string(),
+            roles: "admin,user".to_string(),
+            active: true,
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(UserError::Conflict(_)) => Ok(()),
+        Err(_) => panic!("unexpected error upon test admin user creation"),
+    }
+}
+
 pub async fn login_as_admin(client: &reqwest::Client, sut: &TestApp) -> String {
     let login = client
         .post(sut.build_path(API_PATH_LOGIN))
-        .json(&json!({ "username": "admin", "password": "pass1234" }))
+        .json(&json!({ "username": TEST_ADMIN_USERNAME, "password": TEST_ADMIN_PASSWORD }))
         .send()
         .await
         .unwrap();
