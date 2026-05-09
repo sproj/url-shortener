@@ -5,8 +5,13 @@ on:
     branches: ["main"]
     tags: ["v*"]
     paths:
-      - "crates/analytics-consumer/**"
-      - "crates/common/**"
+      - "crates/analytics-consumer/src/**"
+      - "crates/analytics-consumer/Cargo.toml"
+      - "crates/analytics-consumer/Cargo.lock"
+      - "crates/analytics-consumer/Dockerfile"
+      - "crates/common/src/**"
+      - "crates/common/Cargo.toml"
+      - "crates/common/Cargo.lock"
 
 jobs:
   build:

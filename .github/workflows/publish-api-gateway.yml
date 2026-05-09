@@ -5,8 +5,13 @@ on:
     branches: ["main"]
     tags: ["v*"]
     paths:
-      - "crates/api-gateway/**"
-      - "crates/common/**"
+      - "crates/api-gateway/src/**"
+      - "crates/api-gateway/Cargo.toml"
+      - "crates/api-gateway/Cargo.lock"
+      - "crates/api-gateway/Dockerfile"
+      - "crates/common/src/**"
+      - "crates/common/Cargo.toml"
+      - "crates/common/Cargo.lock"
 
 jobs:
   build:
