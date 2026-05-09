@@ -1,7 +1,9 @@
+use lapin::Channel;
 use lapin::options::ExchangeDeclareOptions;
 use lapin::types::FieldTable;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::{Resource, trace as sdktrace};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
@@ -15,27 +17,9 @@ use url_shortener::infrastructure::{
 
 #[tokio::main]
 async fn main() -> Result<(), StartupError> {
-    let provider = init_tracer();
+    let provider = get_tracing_provider();
 
-    let tracer = provider.tracer("url-shortener");
-
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                EnvFilter::new("debug,opentelemetry_sdk=off,opentelemetry=off,h2=off,hyper=off")
-            }),
-        ))
-        .with(
-            tracing_opentelemetry::layer()
-                .with_tracer(tracer)
-                .with_filter(filter_fn(|meta| {
-                    !meta.target().starts_with("h2")
-                        && !meta.target().starts_with("tower")
-                        && !meta.target().starts_with("hyper")
-                })),
-        )
-        .try_init()
-        .map_err(|e| StartupError::TracingSubscriber(e.to_string()))?;
+    init_tracer(&provider)?;
 
     let result = run().await;
 
@@ -59,6 +43,14 @@ async fn run() -> Result<(), StartupError> {
     let redis = connect::connect(&cfg.redis).await?;
 
     let mut builder = App::builder(cfg.clone(), db_pool).with_redis(redis);
+
+    if let Some(channel) = init_rabbitmq(&cfg).await? {
+        builder = builder.with_rabbitmq(channel);
+    }
+    builder.build().await?.start().await
+}
+
+async fn init_rabbitmq(cfg: &config::Config) -> Result<Option<Channel>, StartupError> {
     if let Some(ref rmq_cfg) = cfg.rabbitmq {
         let channel = rabbitmq_connect::connect(rmq_cfg).await?;
         channel
@@ -70,12 +62,38 @@ async fn run() -> Result<(), StartupError> {
             )
             .await
             .map_err(|e| StartupError::RabbitMqConnection(e.to_string()))?;
-        builder = builder.with_rabbitmq(channel);
+        return Ok(Some(channel));
     }
-    builder.build().await?.start().await
+    Ok(None)
 }
 
-fn init_tracer() -> sdktrace::SdkTracerProvider {
+const APP_TRACE_NAME: &str = "url-shortener";
+
+fn init_tracer(provider: &SdkTracerProvider) -> Result<(), StartupError> {
+    let tracer = provider.tracer(APP_TRACE_NAME);
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                EnvFilter::new("debug,opentelemetry_sdk=off,opentelemetry=off,h2=off,hyper=off")
+            }),
+        ))
+        .with(
+            tracing_opentelemetry::layer()
+                .with_tracer(tracer)
+                .with_filter(filter_fn(|meta| {
+                    !meta.target().starts_with("h2")
+                        && !meta.target().starts_with("tower")
+                        && !meta.target().starts_with("hyper")
+                })),
+        )
+        .try_init()
+        .map_err(|e| StartupError::TracingSubscriber(e.to_string()))?;
+
+    Ok(())
+}
+
+fn get_tracing_provider() -> sdktrace::SdkTracerProvider {
     let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
         .unwrap_or_else(|_| "http://localhost:4317".to_string());
 
@@ -89,7 +107,7 @@ fn init_tracer() -> sdktrace::SdkTracerProvider {
         .with_batch_exporter(exporter)
         .with_resource(
             Resource::builder()
-                .with_service_name("url-shortener")
+                .with_service_name(APP_TRACE_NAME)
                 .build(),
         )
         .build();
