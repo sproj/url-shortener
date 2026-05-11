@@ -85,19 +85,21 @@ impl ShortUrlServiceTrait for ShortUrlService {
     }
 
     #[instrument(skip(self))]
-    async fn get_by_uuid(&self, short_url_uuid: Uuid) -> Result<Option<ShortUrl>, ShortUrlError> {
-        self.short_url_repository
-            .get_by_uuid(short_url_uuid)
-            .await
-            .map_err(ShortUrlError::Storage)
+    async fn get_by_uuid(&self, short_url_uuid: Uuid) -> Result<ShortUrl, ShortUrlError> {
+        match self.short_url_repository.get_by_uuid(short_url_uuid).await {
+            Ok(Some(short)) => Ok(short),
+            Ok(None) => return Err(ShortUrlError::NotFound(short_url_uuid.to_string())),
+            Err(e) => return Err(ShortUrlError::from(e)),
+        }
     }
 
     #[instrument(skip(self))]
-    async fn get_by_code(&self, code: &str) -> Result<Option<ShortUrl>, ShortUrlError> {
-        self.short_url_repository
-            .get_by_code(code)
-            .await
-            .map_err(ShortUrlError::Storage)
+    async fn get_by_code(&self, code: &str) -> Result<ShortUrl, ShortUrlError> {
+        match self.short_url_repository.get_by_code(code).await {
+            Ok(Some(short)) => Ok(short),
+            Ok(None) => return Err(ShortUrlError::NotFound(code.to_string())),
+            Err(e) => return Err(ShortUrlError::from(e)),
+        }
     }
 
     #[instrument(skip(self))]
@@ -107,11 +109,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         user_uuid: Uuid,
         is_admin: bool,
     ) -> Result<bool, ShortUrlError> {
-        let rec = match self.short_url_repository.get_by_uuid(short_url_uuid).await {
-            Ok(Some(short)) => short,
-            Ok(None) => return Err(ShortUrlError::NotFound(short_url_uuid.to_string())),
-            Err(e) => return Err(ShortUrlError::from(e)),
-        };
+        let rec = self.get_by_uuid(short_url_uuid).await?;
 
         self.require_owner_or_admin(&rec, user_uuid, is_admin)
             .await?;
@@ -245,14 +243,7 @@ impl ShortUrlServiceTrait for ShortUrlService {
         is_admin: bool,
         dto: ValidatedUpdateShortUrlRequest,
     ) -> Result<ShortUrl, ShortUrlError> {
-        let short = match self.short_url_repository.get_by_uuid(short_uuid).await? {
-            None => {
-                return Err(ShortUrlError::NotFound(
-                    format!("short url with {short_uuid} not found").to_string(),
-                ));
-            }
-            Some(short) => short,
-        };
+        let short = self.get_by_uuid(short_uuid).await?;
 
         self.require_owner_or_admin(&short, user_uuid, is_admin)
             .await?;
@@ -544,8 +535,6 @@ mod tests {
 
         let actual = sut.get_by_uuid(created.uuid).await.unwrap();
 
-        assert!(actual.is_some());
-        let actual = actual.unwrap();
         assert_eq!(actual.uuid, created.uuid);
         assert_eq!(actual.code, created.code);
     }
@@ -557,8 +546,6 @@ mod tests {
 
         let actual = sut.get_by_code(&created.code).await.unwrap();
 
-        assert!(actual.is_some());
-        let actual = actual.unwrap();
         assert_eq!(actual.uuid, created.uuid);
         assert_eq!(actual.code, created.code);
     }
@@ -583,7 +570,7 @@ mod tests {
         assert!(actual);
         assert_eq!(cache.deleted_codes(), vec!["delete-me".to_string()]);
 
-        let deleted = sut.get_by_uuid(short.uuid).await.unwrap().unwrap();
+        let deleted = sut.get_by_uuid(short.uuid).await.unwrap();
         assert!(deleted.deleted_at.is_some());
     }
 
