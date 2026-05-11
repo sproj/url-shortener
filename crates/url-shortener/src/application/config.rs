@@ -23,10 +23,10 @@ pub struct AppConfig {
 pub struct JwtConfig {
     pub jwt_secret: String,
     pub jwt_keys: JwtKeys,
-    pub jwt_expire_access_token_seconds: i64,
-    pub jwt_expire_refresh_token_seconds: i64,
-    pub jwt_validation_leeway_seconds: i64,
-    pub jwt_enable_revoked_tokens: bool,
+    // pub jwt_expire_access_token_seconds: i64,
+    // pub jwt_expire_refresh_token_seconds: i64,
+    // pub jwt_validation_leeway_seconds: i64,
+    // pub jwt_enable_revoked_tokens: bool,
 }
 
 impl Config {
@@ -89,10 +89,10 @@ pub fn load() -> Result<Config, StartupError> {
         jwt: JwtConfig {
             jwt_keys: JwtKeys::new(jwt_secret.as_bytes()),
             jwt_secret,
-            jwt_expire_access_token_seconds: env_parse("JWT_EXPIRE_ACCESS_TOKEN_SECONDS")?,
-            jwt_expire_refresh_token_seconds: env_parse("JWT_EXPIRE_REFRESH_TOKEN_SECONDS")?,
-            jwt_validation_leeway_seconds: env_parse("JWT_VALIDATION_LEEWAY_SECONDS")?,
-            jwt_enable_revoked_tokens: env_parse("JWT_ENABLE_REVOKED_TOKENS")?,
+            // jwt_expire_access_token_seconds: env_parse("JWT_EXPIRE_ACCESS_TOKEN_SECONDS")?,
+            // jwt_expire_refresh_token_seconds: env_parse("JWT_EXPIRE_REFRESH_TOKEN_SECONDS")?,
+            // jwt_validation_leeway_seconds: env_parse("JWT_VALIDATION_LEEWAY_SECONDS")?,
+            // jwt_enable_revoked_tokens: env_parse("JWT_ENABLE_REVOKED_TOKENS")?,
         },
         rabbitmq: match std::env::var("RABBITMQ_HOST") {
             Ok(host) => Some(RabbitMqConfig {
@@ -190,10 +190,10 @@ mod tests {
             jwt: JwtConfig {
                 jwt_secret: "secret".to_string(),
                 jwt_keys: JwtKeys::new("secret".as_bytes()),
-                jwt_expire_access_token_seconds: 60,
-                jwt_expire_refresh_token_seconds: 600,
-                jwt_validation_leeway_seconds: 30,
-                jwt_enable_revoked_tokens: false,
+                // jwt_expire_access_token_seconds: 60,
+                // jwt_expire_refresh_token_seconds: 600,
+                // jwt_validation_leeway_seconds: 30,
+                // jwt_enable_revoked_tokens: false,
             },
             rabbitmq: None,
         }

@@ -173,15 +173,11 @@ mod tests {
                 redis_port: 6379,
             },
             jwt: JwtConfig {
-                jwt_enable_revoked_tokens: false,
-                jwt_expire_access_token_seconds: 60,
                 jwt_keys: JwtKeys {
-                    encoding: EncodingKey::from_secret("test_secret".as_bytes()),
                     decoding: DecodingKey::from_secret("test_secret".as_bytes()),
+                    encoding: EncodingKey::from_secret("test_secret".as_bytes()),
                 },
-                jwt_expire_refresh_token_seconds: 60,
                 jwt_secret: "test_secret".to_string(),
-                jwt_validation_leeway_seconds: 10,
             },
             rabbitmq: None,
         };

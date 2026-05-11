@@ -18,8 +18,8 @@ use crate::{
 #[async_trait::async_trait]
 pub trait ShortUrlServiceTrait: Send + Sync {
     async fn get_all(&self) -> Result<Vec<ShortUrl>, ShortUrlError>;
-    async fn get_by_uuid(&self, uuid: Uuid) -> Result<Option<ShortUrl>, ShortUrlError>;
-    async fn get_by_code(&self, code: &str) -> Result<Option<ShortUrl>, ShortUrlError>;
+    async fn get_by_uuid(&self, uuid: Uuid) -> Result<ShortUrl, ShortUrlError>;
+    async fn get_by_code(&self, code: &str) -> Result<ShortUrl, ShortUrlError>;
     async fn delete_one_by_uuid(
         &self,
         uuid: Uuid,

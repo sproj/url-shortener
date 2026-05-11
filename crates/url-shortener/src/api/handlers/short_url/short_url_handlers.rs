@@ -151,13 +151,9 @@ pub async fn get_one_by_uuid(
     Path(uuid): Path<Uuid>,
 ) -> Result<Json<ShortUrl>, ApiError> {
     tracing::debug!(%uuid, "get one by uuid");
-    if let Some(short) = state.short_url_service.get_by_uuid(uuid).await? {
-        tracing::debug!(?short, "ok");
-        Ok(Json(short))
-    } else {
-        tracing::warn!(%uuid, "not found");
-        Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
-    }
+    let short = state.short_url_service.get_by_uuid(uuid).await?;
+    tracing::debug!(?short, "ok");
+    Ok(Json(short))
 }
 
 #[utoipa::path(
@@ -231,17 +227,12 @@ pub async fn delete_one_by_uuid(
     let user_uuid = Uuid::parse_str(&access_claims.sub).map_err(|_| AuthError::InvalidToken)?;
     let is_admin = access_claims.validate_role_admin().is_ok();
 
-    if state
+    state
         .short_url_service
         .delete_one_by_uuid(uuid, user_uuid, is_admin)
-        .await?
-    {
-        tracing::debug!(%uuid, "ok");
-        Ok(Json(uuid.to_string()))
-    } else {
-        tracing::warn!(%uuid, "not found");
-        Err(ApiError::from(ShortUrlError::NotFound(uuid.to_string())))
-    }
+        .await?;
+    tracing::debug!(%uuid, "ok");
+    Ok(Json(uuid.to_string()))
 }
 
 #[utoipa::path(
@@ -263,14 +254,7 @@ pub async fn get_one_by_code(
     Path(code): Path<String>,
 ) -> Result<Json<ShortUrl>, ApiError> {
     tracing::debug!(%code, "get one by code");
-    match state.short_url_service.get_by_code(&code).await? {
-        None => {
-            tracing::warn!(%code, "not found");
-            Err(ApiError::from(ShortUrlError::NotFound(code)))
-        }
-        Some(short) => {
-            tracing::debug!(%short, "ok");
-            Ok(Json(short))
-        }
-    }
+    let short = state.short_url_service.get_by_code(&code).await?;
+    tracing::debug!(%short, "ok");
+    Ok(Json(short))
 }
