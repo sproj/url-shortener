@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     application::{
+        consume_result::ConsumeResult,
         repository::redirect_event_repository_trait::RedirectRepositoryTrait,
         service::{
             analytics_consumer_trait::AnalyticsConsumerTrait,
@@ -32,18 +33,28 @@ impl AnalyticsService {
 impl AnalyticsServiceTrait for AnalyticsService {
     async fn run(&self) -> Result<(), MessagingError> {
         loop {
-            let (event, handle) = self.consumer.next().await?;
-            tracing::debug!("redirect consumer received an event");
-            match self.repository.save(&event).await {
-                Ok(_) => {
-                    tracing::debug!("saved event, acking");
-                    handle.ack().await?;
-                    tracing::debug!("acked");
-                    continue;
+            match self.consumer.next().await {
+                ConsumeResult::Message(event, handle) => {
+                    tracing::debug!("redirect consumer received an event");
+                    match self.repository.save(&event).await {
+                        Ok(_) => {
+                            tracing::debug!("saved event, acking");
+                            handle.ack().await?;
+                            tracing::debug!("acked");
+                            continue;
+                        }
+                        Err(e) => {
+                            tracing::error!(%e, "repository failed to save event");
+                            continue;
+                        }
+                    }
                 }
-                Err(e) => {
-                    tracing::error!(%e, "repository failed to save event");
-                    continue;
+                ConsumeResult::InvalidMessage(error, handle) => {
+                    tracing::error!(%error, "redirect event consumer received invalid message.");
+                    handle.nack(false).await?;
+                }
+                ConsumeResult::ChannelError(e) => {
+                    tracing::error!(%e, "analytics consumer channel failed");
                 }
             }
         }
