@@ -17,3 +17,4 @@ redis.workspace = true
 deadpool-postgres.workspace = true
 chrono.workspace = true
 url.workspace = true
+uuid.workspace = true

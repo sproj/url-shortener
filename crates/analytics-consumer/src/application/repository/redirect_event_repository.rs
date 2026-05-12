@@ -22,9 +22,10 @@ impl RedirectEventRepository {
 
 const INSERT_REDIRECT_EVENT: &str = "
 INSERT INTO redirect_events 
-(code, long_url, redirect_type, timestamp) 
+(code, long_url, redirect_type, timestamp, event_id) 
 VALUES 
-($1, $2, $3, $4);";
+($1, $2, $3, $4, $5)
+ON CONFLICT (event_id) DO NOTHING;";
 #[async_trait::async_trait]
 impl RedirectRepositoryTrait for RedirectEventRepository {
     async fn save(&self, event: &RedirectEvent) -> Result<(), RepositoryError> {
@@ -37,12 +38,18 @@ impl RedirectRepositoryTrait for RedirectEventRepository {
         let insert_redirect_event = client
             .prepare_typed(
                 INSERT_REDIRECT_EVENT,
-                &[Type::TEXT, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ],
+                &[
+                    Type::TEXT,
+                    Type::TEXT,
+                    Type::TEXT,
+                    Type::TIMESTAMPTZ,
+                    Type::UUID,
+                ],
             )
             .await
             .map_err(|e| RepositoryError::Internal(DatabaseError::from(e).to_string()))?;
 
-        let params: &[&(dyn ToSql + Sync); 4] = &[
+        let params: &[&(dyn ToSql + Sync); 5] = &[
             &event.code,
             &event.long_url,
             match &event.redirect_type {
@@ -50,6 +57,7 @@ impl RedirectRepositoryTrait for RedirectEventRepository {
                 RedirectType::Temporary => &"temporary",
             },
             &event.timestamp,
+            &event.event_id,
         ];
 
         let insert_result = client
@@ -57,7 +65,11 @@ impl RedirectRepositoryTrait for RedirectEventRepository {
             .await
             .map_err(|e| RepositoryError::Internal(DatabaseError::from(e).to_string()))?;
 
-        tracing::debug!(%insert_result, "inserted event");
+        if insert_result == 0 {
+            tracing::debug!(%event.event_id, %event.code, "deduplicated event (already seen)")
+        } else {
+            tracing::debug!(%insert_result, "inserted event");
+        }
 
         Ok(())
     }
