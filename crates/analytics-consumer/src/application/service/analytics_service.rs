@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use crate::application::{
-    repository::redirect_event_repository_trait::RedirectRepositoryTrait,
-    service::{
-        analytics_consumer_trait::AnalyticsConsumerTrait,
-        analytics_service_trait::AnalyticsServiceTrait,
+use crate::{
+    application::{
+        repository::redirect_event_repository_trait::RedirectRepositoryTrait,
+        service::{
+            analytics_consumer_trait::AnalyticsConsumerTrait,
+            analytics_service_trait::AnalyticsServiceTrait,
+        },
     },
-    startup_error::StartupError,
+    infrastructure::messaging::messaging_error::MessagingError,
 };
 
 pub struct AnalyticsService {
@@ -28,21 +30,14 @@ impl AnalyticsService {
 
 #[async_trait::async_trait]
 impl AnalyticsServiceTrait for AnalyticsService {
-    async fn run(&self) -> Result<(), StartupError> {
+    async fn run(&self) -> Result<(), MessagingError> {
         loop {
-            let (event, handle) = self
-                .consumer
-                .next()
-                .await
-                .map_err(|e| StartupError::RabbitMqConnection(e.to_string()))?;
+            let (event, handle) = self.consumer.next().await?;
             tracing::debug!("redirect consumer received an event");
             match self.repository.save(&event).await {
                 Ok(_) => {
                     tracing::debug!("saved event, acking");
-                    handle
-                        .ack()
-                        .await
-                        .map_err(|e| StartupError::RabbitMqConnection(e.to_string()))?;
+                    handle.ack().await?;
                     tracing::debug!("acked");
                     continue;
                 }
