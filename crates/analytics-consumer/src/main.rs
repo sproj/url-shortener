@@ -26,7 +26,7 @@ async fn main() -> Result<(), StartupError> {
     let app = build().await?;
     let consumer = app.state().analytics.clone();
     tokio::select! {
-        r = consumer.run() => r?,
+        r = consumer.run() => r.map_err(|e| StartupError::RabbitMqConnection(e.to_string()))?,
         r = app.start() => r?
     }
 

@@ -1,6 +1,6 @@
-use crate::application::startup_error::StartupError;
+use crate::infrastructure::messaging::messaging_error::MessagingError;
 
 #[async_trait::async_trait]
 pub trait AnalyticsServiceTrait: Send + Sync {
-    async fn run(&self) -> Result<(), StartupError>;
+    async fn run(&self) -> Result<(), MessagingError>;
 }
