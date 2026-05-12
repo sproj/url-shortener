@@ -9,8 +9,8 @@ use tokio::sync::Mutex;
 use tracing::instrument;
 
 use crate::{
-    application::service::{
-        ack_handle_trait::AckHandle, analytics_consumer_trait::AnalyticsConsumerTrait,
+    application::{
+        consume_result::ConsumeResult, service::analytics_consumer_trait::AnalyticsConsumerTrait,
     },
     infrastructure::messaging::{
         messaging_error::MessagingError, rabbitmq_ack_handle::RabbitMqAckHandle,
@@ -90,24 +90,30 @@ impl RabbitMqConsumer {
 #[async_trait::async_trait]
 impl AnalyticsConsumerTrait for RabbitMqConsumer {
     #[instrument(skip(self))]
-    async fn next(&self) -> Result<(RedirectEvent, Box<dyn AckHandle>), MessagingError> {
+    async fn next(&self) -> ConsumeResult {
         let mut guard = self.consumer.lock().await;
-        let consumer = guard.as_mut().ok_or(MessagingError::NoConsumer)?;
-        if let Some(delivery_result) = consumer.next().await {
-            match delivery_result {
-                Ok(delivery) => {
+        match guard.as_mut() {
+            None => ConsumeResult::ChannelError(MessagingError::NoConsumer),
+
+            Some(consumer) => match consumer.next().await {
+                Some(Ok(delivery)) => {
                     tracing::debug!("received message");
-                    let event = serde_json::from_slice::<RedirectEvent>(&delivery.data)
-                        .map_err(|e| MessagingError::Deserialization(e.to_string()))?;
-                    Ok((event, Box::new(RabbitMqAckHandle { delivery })))
+                    match serde_json::from_slice::<RedirectEvent>(&delivery.data) {
+                        Ok(event) => {
+                            ConsumeResult::Message(event, Box::new(RabbitMqAckHandle { delivery }))
+                        }
+                        Err(e) => ConsumeResult::InvalidMessage(
+                            MessagingError::Deserialization(e.to_string()),
+                            Box::new(RabbitMqAckHandle { delivery }),
+                        ),
+                    }
                 }
-                Err(e) => {
+                Some(Err(e)) => {
                     tracing::error!(%e, "delivery error encountered");
-                    Err(MessagingError::RabbitMq(e))
+                    ConsumeResult::ChannelError(MessagingError::RabbitMq(e))
                 }
-            }
-        } else {
-            Err(MessagingError::EmptyMessage)
+                None => ConsumeResult::ChannelError(MessagingError::EmptyMessage),
+            },
         }
     }
 }
