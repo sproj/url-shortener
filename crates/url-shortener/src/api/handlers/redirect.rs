@@ -7,6 +7,7 @@ use axum::{
 };
 use chrono::Utc;
 use tracing::instrument;
+use uuid::Uuid;
 
 use crate::{
     api::error::ApiError,
@@ -78,6 +79,7 @@ fn emit_analytics(
 ) {
     let publisher = Arc::clone(&state.analytics_publisher);
     let event = RedirectEvent {
+        event_id: Uuid::new_v4(),
         code,
         long_url,
         timestamp: Utc::now(),

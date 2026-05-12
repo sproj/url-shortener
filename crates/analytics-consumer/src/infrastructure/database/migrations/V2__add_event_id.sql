@@ -1,0 +1,1 @@
+ALTER TABLE redirect_events ADD COLUMN event_id UUID NOT NULL UNIQUE;
