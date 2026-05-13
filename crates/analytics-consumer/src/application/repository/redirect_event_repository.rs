@@ -33,7 +33,7 @@ impl RedirectRepositoryTrait for RedirectEventRepository {
             .db_pool
             .get()
             .await
-            .map_err(|e| RepositoryError::Internal(DatabaseError::Pool(e).to_string()))?;
+            .map_err(|e| RepositoryError::Pool(DatabaseError::Pool(e).to_string()))?;
 
         let insert_redirect_event = client
             .prepare_typed(

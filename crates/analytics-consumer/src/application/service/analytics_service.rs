@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use common::repository_error::RepositoryError;
+
 use crate::{
     application::{
         consume_result::ConsumeResult,
@@ -43,18 +45,36 @@ impl AnalyticsServiceTrait for AnalyticsService {
                             tracing::debug!("acked");
                             continue;
                         }
-                        Err(e) => {
-                            tracing::error!(%e, "repository failed to save event");
-                            continue;
-                        }
+                        Err(e) => match e {
+                            RepositoryError::Internal(e) => {
+                                tracing::error!(%e, "repository query write event");
+                                handle.nack(false).await?;
+                                continue;
+                            }
+                            RepositoryError::Pool(e) => {
+                                tracing::error!(%e, "repository pool failure");
+                                handle.nack(true).await?;
+                                continue;
+                            }
+                            RepositoryError::Conflict {
+                                constraint: _,
+                                message,
+                            } => {
+                                tracing::warn!(%message, "duplicate insert failed");
+                                handle.ack().await?;
+                                continue;
+                            }
+                        },
                     }
                 }
                 ConsumeResult::InvalidMessage(error, handle) => {
                     tracing::error!(%error, "redirect event consumer received invalid message.");
                     handle.nack(false).await?;
+                    continue;
                 }
                 ConsumeResult::ChannelError(e) => {
                     tracing::error!(%e, "analytics consumer channel failed");
+                    return Err(e);
                 }
             }
         }

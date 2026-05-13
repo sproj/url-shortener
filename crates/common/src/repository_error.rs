@@ -7,6 +7,8 @@ pub enum RepositoryError {
         constraint: Option<String>,
         message: String,
     },
+    #[error("repository pool error: {0}")]
+    Pool(String),
     #[error("database level error: {0}")]
     Internal(String),
 }

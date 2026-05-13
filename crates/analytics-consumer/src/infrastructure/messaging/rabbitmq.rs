@@ -3,7 +3,7 @@ use futures_lite::stream::StreamExt;
 use lapin::{
     Channel, Consumer,
     options::{BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions},
-    types::FieldTable,
+    types::{AMQPValue, FieldTable, ShortString},
 };
 use tokio::sync::Mutex;
 use tracing::instrument;
@@ -24,6 +24,9 @@ pub struct RabbitMqConsumer {
     consumer: Mutex<Option<Consumer>>,
 }
 
+const ANALYTICS_DLQ_NAME: &str = "analytics_redirect_events_dlq";
+const ANALYTICS_DLX_NAME: &str = "url-shortener-dlx";
+
 impl RabbitMqConsumer {
     pub fn new(channel: Channel, exchange_name: String, queue_name: String) -> Self {
         Self {
@@ -35,6 +38,29 @@ impl RabbitMqConsumer {
     }
 
     pub async fn setup(self, routing_key: &str) -> Result<Self, MessagingError> {
+        self.declare_main_exchange().await;
+
+        self.declare_dlx_exchange().await;
+
+        self.declare_dlq_queue().await;
+
+        self.bind_dlq_to_dlx().await;
+
+        self.declare_main_queue().await;
+
+        self.bind_main_queue_to_main_exchange(routing_key).await;
+
+        let consumer = self.start_basic_consumer().await;
+
+        Ok(Self {
+            channel: self.channel,
+            exchange_name: self.exchange_name,
+            queue_name: self.queue_name,
+            consumer: Mutex::new(Some(consumer)),
+        })
+    }
+
+    async fn declare_main_exchange(&self) {
         self.channel
             .exchange_declare(
                 self.exchange_name.clone().into(),
@@ -43,10 +69,25 @@ impl RabbitMqConsumer {
                 FieldTable::default(),
             )
             .await
-            .expect("failed to declare exchange");
+            .expect("failed to declare analytics exchange");
+    }
+
+    async fn declare_dlx_exchange(&self) {
+        self.channel
+            .exchange_declare(
+                ANALYTICS_DLX_NAME.into(),
+                lapin::ExchangeKind::Direct,
+                ExchangeDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await
+            .expect("failed to declare DLX exchange");
+    }
+
+    async fn declare_dlq_queue(&self) {
         self.channel
             .queue_declare(
-                self.queue_name.clone().into(),
+                ANALYTICS_DLQ_NAME.into(),
                 QueueDeclareOptions {
                     durable: true,
                     ..Default::default()
@@ -54,8 +95,46 @@ impl RabbitMqConsumer {
                 FieldTable::default(),
             )
             .await
-            .expect("failed to create queue");
+            .expect("failed to declare analytics DLQ");
+    }
 
+    async fn bind_dlq_to_dlx(&self) {
+        self.channel
+            .queue_bind(
+                ANALYTICS_DLQ_NAME.into(),
+                ANALYTICS_DLX_NAME.into(),
+                ANALYTICS_DLQ_NAME.into(),
+                QueueBindOptions::default(),
+                FieldTable::default(),
+            )
+            .await
+            .expect("failed to bind DLQ to DLX");
+    }
+
+    async fn declare_main_queue(&self) {
+        let mut exchange_args = FieldTable::default();
+        exchange_args.insert(
+            ShortString::from("x-dead-letter-exchange"),
+            AMQPValue::LongString(ANALYTICS_DLX_NAME.into()),
+        );
+        exchange_args.insert(
+            ShortString::from("x-dead-letter-routing-key"),
+            AMQPValue::LongString(ANALYTICS_DLQ_NAME.into()),
+        );
+        self.channel
+            .queue_declare(
+                self.queue_name.clone().into(),
+                QueueDeclareOptions {
+                    durable: true,
+                    ..Default::default()
+                },
+                exchange_args,
+            )
+            .await
+            .expect("failed to create analytics queue");
+    }
+
+    async fn bind_main_queue_to_main_exchange(&self, routing_key: &str) {
         self.channel
             .queue_bind(
                 self.queue_name.clone().into(),
@@ -66,9 +145,10 @@ impl RabbitMqConsumer {
             )
             .await
             .expect("failed to bind queue");
+    }
 
-        let consumer = self
-            .channel
+    async fn start_basic_consumer(&self) -> Consumer {
+        self.channel
             .basic_consume(
                 self.queue_name.clone().into(),
                 "analytics-consumer".into(),
@@ -76,14 +156,7 @@ impl RabbitMqConsumer {
                 FieldTable::default(),
             )
             .await
-            .expect("failed to create consumer");
-
-        Ok(Self {
-            channel: self.channel,
-            exchange_name: self.exchange_name,
-            queue_name: self.queue_name,
-            consumer: Mutex::new(Some(consumer)),
-        })
+            .expect("failed to create consumer")
     }
 }
 

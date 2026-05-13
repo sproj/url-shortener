@@ -50,6 +50,7 @@ async fn build() -> Result<App, StartupError> {
 
 async fn init_rabbitmq(cfg: &config::Config) -> Result<Channel, StartupError> {
     let channel = messaging::connect::connect(&cfg.rabbitmq).await?;
+
     channel
         .exchange_declare(
             cfg.rabbitmq.rabbitmq_exchange.as_str().into(),
