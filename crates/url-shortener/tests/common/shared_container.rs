@@ -22,7 +22,6 @@ impl<I: Image, C: Send + Clone + Sync> Drop for SharedContainer<I, C> {
 }
 
 pub type ContainerBootstrapOutput<I, C> = (String, ContainerAsync<I>, C);
-// pub type ContainerBootstrap<I, C> = fn(image: I) -> ContainerBootstrapOutput<I, C>;
 
 pub async fn get_or_create_shared_container<I: Image, C: Send + Clone + Sync, F, Fut>(
     storage: &'static Mutex<Weak<SharedContainer<I, C>>>,
