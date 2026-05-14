@@ -53,8 +53,7 @@ impl AnalyticsService {
                 constraint,
                 message,
             }) => {
-                if constraint.is_some() {
-                    let reason = constraint.unwrap();
+                if let Some(reason) = constraint {
                     tracing::warn!(%reason, "redirect event constraint violated");
                 }
                 tracing::warn!(%message, "duplicate insert failed - dead letter");
