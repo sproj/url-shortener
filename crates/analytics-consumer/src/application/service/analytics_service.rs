@@ -14,6 +14,12 @@ use crate::{
     infrastructure::messaging::messaging_error::MessagingError,
 };
 
+pub enum AckDecision {
+    Ack,
+    Requeue,
+    DeadLetter,
+}
+
 pub struct AnalyticsService {
     consumer: Arc<dyn AnalyticsConsumerTrait>,
     repository: Arc<dyn RedirectRepositoryTrait>,
@@ -29,6 +35,37 @@ impl AnalyticsService {
             repository,
         }
     }
+
+    fn repository_result_to_ack_decision(
+        &self,
+        result: Result<(), RepositoryError>,
+    ) -> AckDecision {
+        match result {
+            Ok(_) => {
+                tracing::debug!("saved event, acking");
+                AckDecision::Ack
+            }
+            Err(RepositoryError::Internal(e)) => {
+                tracing::error!(%e, "repository query write failed at database level - dead letter");
+                AckDecision::DeadLetter
+            }
+            Err(RepositoryError::Conflict {
+                constraint,
+                message,
+            }) => {
+                if constraint.is_some() {
+                    let reason = constraint.unwrap();
+                    tracing::warn!(%reason, "redirect event constraint violated");
+                }
+                tracing::warn!(%message, "duplicate insert failed - dead letter");
+                AckDecision::DeadLetter
+            }
+            Err(RepositoryError::Pool(e)) => {
+                tracing::error!(%e, "repository pool failure - requeuing");
+                AckDecision::Requeue
+            }
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -38,33 +75,23 @@ impl AnalyticsServiceTrait for AnalyticsService {
             match self.consumer.next().await {
                 ConsumeResult::Message(event, handle) => {
                     tracing::debug!("redirect consumer received an event");
-                    match self.repository.save(&event).await {
-                        Ok(_) => {
-                            tracing::debug!("saved event, acking");
+                    let save_result = self.repository.save(&event).await;
+                    match self.repository_result_to_ack_decision(save_result) {
+                        AckDecision::Ack => {
                             handle.ack().await?;
-                            tracing::debug!("acked");
+                            tracing::debug!("message acknowledged");
                             continue;
                         }
-                        Err(e) => match e {
-                            RepositoryError::Internal(e) => {
-                                tracing::error!(%e, "repository query write event");
-                                handle.nack(false).await?;
-                                continue;
-                            }
-                            RepositoryError::Pool(e) => {
-                                tracing::error!(%e, "repository pool failure");
-                                handle.nack(true).await?;
-                                continue;
-                            }
-                            RepositoryError::Conflict {
-                                constraint: _,
-                                message,
-                            } => {
-                                tracing::warn!(%message, "duplicate insert failed");
-                                handle.ack().await?;
-                                continue;
-                            }
-                        },
+                        AckDecision::Requeue => {
+                            handle.nack(true).await?;
+                            tracing::debug!("message requeued");
+                            continue;
+                        }
+                        AckDecision::DeadLetter => {
+                            handle.nack(false).await?;
+                            tracing::debug!("message sent to dead letter");
+                            continue;
+                        }
                     }
                 }
                 ConsumeResult::InvalidMessage(error, handle) => {
