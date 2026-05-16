@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 auth = { path = "../auth" }
 common = { path = "../common" }
+reqwest = { version = "^0.13.3", features = ["json", "stream"] }
+wasm-streams = { version = "0.2", optional = true }
 axum.workspace = true
 chrono.workspace = true
 deadpool-postgres.workspace = true
@@ -37,7 +39,6 @@ axum-prometheus.workspace = true
 openssl.workspace = true
 
 [dev-dependencies]
-reqwest = { version = "0.13.1", features = ["json"] }
 testcontainers = { version = "0.27.1", features = ["docker-compose"] }
 testcontainers-modules = { version = "0.15.0", features = [
     "postgres",
