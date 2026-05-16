@@ -1,19 +1,21 @@
 use crate::{
     api::{
         handlers::auth::auth_handlers::{login, logout, refresh},
+        proxy_handler,
         routes::users_routes,
-        swagger::{ApiDoc, StatusResponse},
-        // swagger::{ApiDoc, StatusResponse},
+        swagger::{ApiDoc, StatusResponse}, // swagger::{ApiDoc, StatusResponse},
     },
     application::{config::Config, startup_error::StartupError, state::SharedState},
 };
+
 use axum::{
     Json, Router,
-    extract::{Request, State},
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
 };
+
 use axum_prometheus::PrometheusMetricLayer;
 use serde_json::json;
 use tokio::{net::TcpListener, signal};
@@ -52,7 +54,7 @@ pub async fn serve(listener: TcpListener, state: SharedState) -> Result<(), Star
         .nest("/users", users_routes::routes())
         .route("/metrics", get(async move || metric_handle.render()))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
-        .fallback(error_404_handler)
+        .fallback(proxy_handler::proxy_handler)
         .layer(NormalizePathLayer::trim_trailing_slash())
         .layer(prometheus_layer)
         .with_state(state);
@@ -85,12 +87,6 @@ fn get_or_init_metrics_handle() -> PrometheusHandle {
 // health request handler
 pub(crate) async fn health_handler() -> Result<impl IntoResponse, ()> {
     Ok(Json(json!({"status": "healthy"})))
-}
-
-// 404 handler
-async fn error_404_handler(request: Request) -> impl IntoResponse {
-    tracing::warn!(method = %request.method(), path = %request.uri().path(), "route not found");
-    StatusCode::NOT_FOUND
 }
 
 #[utoipa::path(
@@ -182,6 +178,7 @@ mod tests {
                 jwt_secret: "test_secret".to_string(),
                 jwt_validation_leeway_seconds: 10,
             },
+            proxy_routes: vec![],
         };
 
         let result = listen(config).await;
