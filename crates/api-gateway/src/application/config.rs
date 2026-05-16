@@ -2,6 +2,7 @@ use crate::application::startup_error::StartupError;
 use auth::jwt::JwtKeys;
 pub use common::config::{DbConfig, RedisConfig, ServiceConfig};
 use common::config::{env_get, env_get_or, env_parse};
+use serde::Deserialize;
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug)]
@@ -10,6 +11,7 @@ pub struct Config {
     pub db: DbConfig,
     pub redis: RedisConfig,
     pub jwt: JwtConfig,
+    pub proxy_routes: Vec<ProxyRoute>,
 }
 
 #[derive(Clone, Debug)]
@@ -20,6 +22,12 @@ pub struct JwtConfig {
     pub jwt_expire_refresh_token_seconds: i64,
     pub jwt_validation_leeway_seconds: i64,
     pub jwt_enable_revoked_tokens: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ProxyRoute {
+    pub prefix: String,
+    pub target: String,
 }
 
 impl Config {
@@ -55,6 +63,9 @@ pub fn load() -> Result<Config, StartupError> {
     }
 
     let jwt_secret = env_get("JWT_SECRET")?;
+    let routes_json = env_get("PROXY_ROUTES")?;
+    let proxy_routes: Vec<ProxyRoute> = serde_json::from_str(&routes_json)
+        .map_err(|e| StartupError::Config(format!("PROXY_ROUTES: {e}")))?;
 
     let cfg = Config {
         app: ServiceConfig {
@@ -81,6 +92,7 @@ pub fn load() -> Result<Config, StartupError> {
             jwt_validation_leeway_seconds: env_parse("JWT_VALIDATION_LEEWAY_SECONDS")?,
             jwt_enable_revoked_tokens: env_parse("JWT_ENABLE_REVOKED_TOKENS")?,
         },
+        proxy_routes,
     };
 
     Ok(cfg)
@@ -162,6 +174,7 @@ mod tests {
                 jwt_validation_leeway_seconds: 30,
                 jwt_enable_revoked_tokens: false,
             },
+            proxy_routes: vec![],
         }
     }
 
