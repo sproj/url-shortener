@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: url-shortener
-  namespace: url-shortener
+  name: api-gateway
+  namespace: api-gateway
   labels:
-    app: url-shortener
+    app: api-gateway
     component: api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: url-shortener
+      app: api-gateway
       component: api
   template:
     metadata:
       labels:
-        app: url-shortener
+        app: api-gateway
         component: api
     spec:
       imagePullSecrets:
@@ -27,67 +27,59 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: api-gateway-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: api-gateway-secrets
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: url-shortener-config
+                  name: api-gateway-config
                   key: POSTGRES_HOST
             - name: POSTGRES_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: url-shortener-config
+                  name: api-gateway-config
                   key: POSTGRES_PORT
           command:
             - sh
             - -c
             - |
               CONN="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/postgres"
-              psql "$CONN" -tc "SELECT 1 FROM pg_database WHERE datname='url_shortener'" \
+              psql "$CONN" -tc "SELECT 1 FROM pg_database WHERE datname='api_gateway'" \
                 | grep -q 1 \
-                || psql "$CONN" -c "CREATE DATABASE url_shortener"
+                || psql "$CONN" -c "CREATE DATABASE api_gateway"
       containers:
-        - name: url-shortener
-          image: ghcr.io/sproj/url-shortener@sha256:e84a3c0d8537067721ff9e0946dc37be2804fd3d54fa9e626f13a22b24576543
-          imagePullPolicy: IfNotPresent
+        - name: api-gateway
+          image: ghcr.io/sproj/api-gateway:latest
+          imagePullPolicy: Always
 
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
-                name: url-shortener-config
+                name: api-gateway-config
+            - configMapRef:
+                name: api-gateway-routing-config
           env:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: api-gateway-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: api-gateway-secrets
                   key: POSTGRES_PASSWORD
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: api-gateway-secrets
                   key: JWT_SECRET
-            - name: RABBITMQ_USER
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-secrets
-                  key: username
-            - name: RABBITMQ_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-secrets
-                  key: password
           livenessProbe:
             httpGet:
               path: /health
