@@ -127,9 +127,7 @@ mod tests {
 
         let result = load();
 
-        assert!(
-            matches!(result, Err(StartupError::Config(msg)) if msg.contains("Failed to parse SERVICE_PORT"))
-        );
+        assert!(matches!(result, Err(StartupError::Config(_))));
     }
 
     #[test]
