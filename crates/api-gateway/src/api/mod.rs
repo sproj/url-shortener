@@ -6,3 +6,5 @@ pub mod server;
 
 pub mod error;
 pub mod swagger;
+
+pub mod proxy_handler;
