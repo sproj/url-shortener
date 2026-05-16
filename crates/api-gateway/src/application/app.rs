@@ -101,6 +101,8 @@ impl AppBuilder {
                 cfg.jwt.jwt_expire_refresh_token_seconds,
                 cfg.jwt.jwt_keys.encoding.clone(),
             )),
+            proxy_routes: self.config.proxy_routes.clone(),
+            http_client: reqwest::Client::new(),
         });
 
         Ok(App {
