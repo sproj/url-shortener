@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-routing-config
+  namespace: api-gateway
+data:
+  PROXY_ROUTES: '[{"prefix: "/url", "target": "http://url-shortener-service.url-shortener.svc.cluster.local:8080"}]'
