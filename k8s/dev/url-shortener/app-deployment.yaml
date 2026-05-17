@@ -54,7 +54,7 @@ spec:
                 || psql "$CONN" -c "CREATE DATABASE url_shortener"
       containers:
         - name: url-shortener
-          image: ghcr.io/sproj/url-shortener@sha256:e84a3c0d8537067721ff9e0946dc37be2804fd3d54fa9e626f13a22b24576543
+          image: ghcr.io/sproj/url-shortener@sha256:19af8e13853c107f1d4d63fa7075b5afdb4dc609dc67ae369bdf3353c16341ec
           imagePullPolicy: IfNotPresent
 
           ports:
