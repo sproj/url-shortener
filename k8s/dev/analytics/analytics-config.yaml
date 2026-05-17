@@ -9,7 +9,7 @@ data:
   POSTGRES_HOST: "postgres-service.databases.svc.cluster.local"
   POSTGRES_PORT: "5432"
   POSTGRES_CONNECTION_POOL: "5"
-  RABBITMQ_HOST: "rabbitmq-service"
+  RABBITMQ_HOST: "rabbitmq-service.rabbitmq.svc.cluster.local"
   RABBITMQ_PORT: "5672"
   RABBITMQ_EXCHANGE: "url-shortener"
   REDIRECT_EVENT_ROUTING_KEY: "redirect_events"
