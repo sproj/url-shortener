@@ -81,13 +81,13 @@ spec:
             - name: RABBITMQ_USER
               valueFrom:
                 secretKeyRef:
-                  name: rabbitmq-secrets
-                  key: username
+                  name: url-shortener-secrets
+                  key: rabbitmq-username
             - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: rabbitmq-secrets
-                  key: password
+                  name: url-shortener-secrets
+                  key: rabbitmq-password
           livenessProbe:
             httpGet:
               path: /health
