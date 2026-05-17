@@ -54,7 +54,7 @@ spec:
                 || psql "$CONN" -c "CREATE DATABASE api_gateway"
       containers:
         - name: api-gateway
-          image: ghcr.io/sproj/api-gateway:latest
+          image: ghcr.io/sproj/api-gateway@sha256:d6690f2023d0a938002038831f16d3ccb03925254b52323fbfeaf0ae8acd4e92
           imagePullPolicy: Always
 
           ports:
