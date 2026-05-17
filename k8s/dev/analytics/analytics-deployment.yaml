@@ -27,23 +27,33 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: analytics-consumer-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: url-shortener-secrets
+                  name: analytics-consumer-secrets
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: url-shortener-config
+                  name: analytics-consumer-config
                   key: POSTGRES_HOST
             - name: POSTGRES_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: url-shortener-config
+                  name: analytics-consumer-config
                   key: POSTGRES_PORT
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-consumer-secrets
+                  key: rabbitmq-username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: url-shortener-secrets
+                  key: rabbitmq-password
           command:
             - sh
             - -c
